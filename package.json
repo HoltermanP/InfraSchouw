@@ -2,6 +2,7 @@
   "name": "infraschouw",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,10 +13,13 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate && tsx scripts/fix-migrations.ts",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
-    "db:reset": "tsx scripts/reset.ts",
-    "demo:assets": "tsx scripts/generate-demo-assets.ts"
+    "db:migrate": "tsx --require ./scripts/preload.cjs scripts/migrate.ts",
+    "db:seed": "tsx --require ./scripts/preload.cjs scripts/seed.ts",
+    "db:reset": "tsx --require ./scripts/preload.cjs scripts/reset.ts",
+    "demo:assets": "tsx --require ./scripts/preload.cjs scripts/generate-demo-assets.ts",
+    "postinstall": "node scripts/copy-maplibre-worker.mjs",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

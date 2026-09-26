@@ -46,6 +46,11 @@ const TYPE_ICON: Record<CaptureType, string> = {
   scan: '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>',
 };
 
+// The worker is served from /public (copied at install); bundlers cannot resolve it at runtime.
+if (typeof window !== "undefined" && maplibregl.getWorkerUrl() !== "/maplibre/maplibre-gl-worker.mjs") {
+  maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+}
+
 const baseStyle: StyleSpecification = {
   version: 8,
   sources: {
@@ -81,11 +86,13 @@ function captureMarkerHtml(c: MapCapture, selected: boolean) {
 }
 
 function allCoords(props: InfraMapProps): [number, number][] {
+  // Fit to the recorded data first; the project area / loose points are the fallback.
   const out: [number, number][] = [];
   props.captures?.forEach((c) => out.push([c.lon, c.lat]));
   props.findings?.forEach((f) => out.push([f.lon, f.lat]));
-  props.points?.forEach((p) => out.push([p.lon, p.lat]));
   props.track?.coordinates.forEach((c) => out.push([c[0]!, c[1]!]));
+  if (out.length) return out;
+  props.points?.forEach((p) => out.push([p.lon, p.lat]));
   if (props.area) {
     const polys = props.area.type === "Polygon" ? [props.area.coordinates] : props.area.coordinates;
     polys.forEach((p) => p[0]?.forEach((c) => out.push([c[0]!, c[1]!])));
@@ -288,7 +295,7 @@ export function InfraMap(props: InfraMapProps) {
 
   return (
     <div className={cn("relative overflow-hidden rounded-lg border bg-muted", className)}>
-      <div ref={container} className="absolute inset-0" data-testid="infra-map" />
+      <div ref={container} className="h-full w-full" data-testid="infra-map" />
       {interactive ? (
         <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
           <button

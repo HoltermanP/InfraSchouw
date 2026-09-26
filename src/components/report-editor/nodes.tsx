@@ -19,7 +19,7 @@ function SectionView({ node, updateAttributes }: ReactNodeViewProps) {
   const state = ctx.meta.sections[key];
   const json = node.toJSON() as TiptapNode;
   const edited = !state?.aiHash || sectionHash(json) !== state.aiHash;
-  const aiUntouched = Boolean(state?.aiHash) && !edited;
+  const aiUntouched = Boolean(state?.aiHash) && !edited && !ctx.finalised;
   return (
     <NodeViewWrapper as="section" className="report-section my-6 rounded-lg border bg-card p-4" data-section-key={key} id={`section-${key}`}>
       <div className="mb-2 flex flex-wrap items-center gap-2 border-b pb-2" contentEditable={false}>
@@ -32,7 +32,7 @@ function SectionView({ node, updateAttributes }: ReactNodeViewProps) {
         />
         {aiUntouched ? (
           <span className="rounded bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">AI-voorstel</span>
-        ) : state?.aiHash ? (
+        ) : state?.aiHash && !ctx.finalised ? (
           <span className="rounded bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">Handmatig bewerkt</span>
         ) : null}
         {!ctx.readOnly && ctx.canRegenerate ? (

@@ -38,6 +38,8 @@ export type ReportEditorCtx = {
   meta: ReportMeta;
   mapSnapshotUrl: string | null;
   readOnly: boolean;
+  /** Report finalised: AI badges are no longer shown. */
+  finalised: boolean;
   summary: DataSummary;
   canRegenerate: boolean;
   onRegenerate: (key: string, title: string, edited: boolean) => void;

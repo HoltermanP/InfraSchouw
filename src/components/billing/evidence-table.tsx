@@ -91,7 +91,7 @@ export function EvidenceTable({ rows, canConfirm, canEdit, showInspection = fals
               <td className="px-2 py-1">
                 <div className="flex flex-col items-start gap-1">
                   <BillingStatusBadge status={r.status} />
-                  {r.source === "ai" ? <AiProposalBadge /> : null}
+                  {r.source === "ai" && r.status === "voorgesteld" ? <AiProposalBadge /> : r.source === "ai" ? <span className="text-[10px] text-muted-foreground">bron: AI</span> : null}
                   {r.confidence !== null ? <span className="text-[10px] text-muted-foreground">zekerheid {Math.round(r.confidence * 100)}%</span> : null}
                 </div>
               </td>

@@ -165,9 +165,14 @@ export async function seedDemo(base: SeedBase) {
     });
     stationRows.push(station!);
   }
+  const { seedDemoInspections } = await import("./demo-inspections");
+  const extra = await seedDemoInspections(base, project!, stationRows);
   return {
     project: project!,
     stations: stationRows,
-    summary: `Demoproject ${project!.number} met ${DEMO_BILLING_ITEMS.length} afrekenposten en ${stationRows.length} MS-stations.`,
+    summary: [
+      `Demoproject ${project!.number} met ${DEMO_BILLING_ITEMS.length} afrekenposten, ${stationRows.length} MS-stations, KLIC-laag en 4 schouwen (tracé – definitief, stationsoplevering – AI-concept, nulmeting – in bewerking, losse calamiteit – ter review).`,
+      ...extra,
+    ].join("\n"),
   };
 }

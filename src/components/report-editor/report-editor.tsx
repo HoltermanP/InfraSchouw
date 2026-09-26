@@ -280,6 +280,7 @@ export function ReportEditor(props: {
       meta,
       mapSnapshotUrl: props.mapSnapshotUrl,
       readOnly,
+      finalised: locked,
       summary: props.summary,
       canRegenerate: props.aiEnabled,
       onRegenerate: (key: string, title: string, edited: boolean) => {
@@ -288,7 +289,7 @@ export function ReportEditor(props: {
         setRegenInstruction("");
       },
     }),
-    [props.inspectionId, props.reportId, captureMap, findingMap, meta, props.mapSnapshotUrl, readOnly, props.summary, props.aiEnabled],
+    [props.inspectionId, props.reportId, captureMap, findingMap, meta, props.mapSnapshotUrl, readOnly, locked, props.summary, props.aiEnabled],
   );
 
   return (
@@ -392,7 +393,7 @@ export function ReportEditor(props: {
                   </button>
                 ))}
               </div>
-              <div className="max-h-[calc(100dvh-12rem)] overflow-y-auto rounded-md border p-3">
+              <div className="max-h-[calc(100dvh_-_12rem)] overflow-y-auto rounded-md border p-3">
                 {panel === "fotos" ? <PhotoPanel captures={props.captures} usedIds={usedIds} /> : null}
                 {panel === "aandachtspunten" ? (
                   <KeyPointsEditor points={meta.keyPoints} onChange={(keyPoints) => updateMeta({ keyPoints })} readOnly={readOnly} findings={props.findings.map((f) => ({ id: f.id, title: f.title, nr: f.nr }))} />

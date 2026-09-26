@@ -218,7 +218,7 @@ export function InspectionMapView({
 
   return (
     <div className="flex flex-col gap-3 px-4 py-4 md:px-8 lg:flex-row">
-      <div className="relative h-[60vh] min-h-96 flex-1 lg:h-[calc(100dvh-16rem)]">
+      <div className="relative h-[60vh] min-h-96 flex-1 lg:h-[calc(100dvh_-_16rem)]">
         <LazyMap
           className="h-full"
           captures={located.map((c) => ({ id: c.id, type: c.type, lat: c.lat!, lon: c.lon!, seq: c.seq, heading: c.heading, label: `${CAPTURE_TYPE_LABELS[c.type]} ${c.seq ?? ""}` }))}
@@ -317,7 +317,7 @@ export function InspectionMapView({
               <CameraIcon className="size-4" /> Rode lijn = gelopen GPS-track; gekleurde spelden = bevindingen per prioriteit.
             </p>
             <ul className={cn("mt-2 grid grid-cols-4 gap-2")}>
-              {navigable.slice(0, 16).map((c) => (
+              {navigable.filter((c) => c.type === "photo" || c.type === "video" || c.type === "sketch").slice(0, 16).map((c) => (
                 <li key={c.id}>
                   <button type="button" onClick={() => setSelected({ kind: "capture", id: c.id })} className="block overflow-hidden rounded" aria-label={`Open ${CAPTURE_TYPE_LABELS[c.type]} ${c.seq ?? ""}`}>
                     <CaptureMedia c={c} />
