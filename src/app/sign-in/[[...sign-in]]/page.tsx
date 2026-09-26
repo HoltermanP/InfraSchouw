@@ -1,0 +1,12 @@
+import { redirect } from "next/navigation";
+import { SignIn } from "@clerk/nextjs";
+import { authMode } from "@/lib/auth/session";
+
+export default function SignInPage() {
+  if (authMode() !== "clerk") redirect("/demo-login");
+  return (
+    <main className="flex flex-1 items-center justify-center p-6">
+      <SignIn />
+    </main>
+  );
+}
