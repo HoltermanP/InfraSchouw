@@ -102,7 +102,7 @@ test("statusflow tot definitief, deellink maken, openen en intrekken", async ({ 
   await anon.close();
 });
 
-test("zonder OpenAI-sleutel: sectie hergenereren geeft duidelijke melding, rest werkt", async ({ page }) => {
+test("zonder OpenAI-sleutel: geen hergenereerknop, verslag en PDF-export werken", async ({ page }) => {
   await loginAs(page, "schouwer");
   const href = await hrefOf(page, "Stationsoplevering ZWL-STH-4012 Frankhuizerallee");
   await page.goto(`${href}/verslag`);

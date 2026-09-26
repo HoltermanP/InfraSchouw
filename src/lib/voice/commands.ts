@@ -26,7 +26,8 @@ export const VOICE_HELP: { say: string; does: string }[] = [
   { say: "meting diepte 72 centimeter", does: "Legt een meting vast" },
   { say: "volgende shot / vorige shot", does: "Bladert door de shotlist" },
   { say: "scan", does: "Opent de QR/barcodescanner" },
-  { say: "afronden", does: "Opent het afronden van de schouw" },
+  { say: "afronden", does: "Telefoon: opent het afrondscherm. Bril: rondt direct af, of toont eerst de open verplichte punten" },
+  { say: "reden … (tekst)", does: "Na “afronden”: slaat de open punten over met deze reden en rondt af (bril)" },
   { say: "help", does: "Toont deze lijst" },
   { say: "stop handsfree", does: "Zet de spraakbediening uit" },
 ];

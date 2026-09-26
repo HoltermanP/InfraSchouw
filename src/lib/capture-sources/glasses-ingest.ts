@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { inspections, type Device } from "@/db/schema";
-import type { OrgCtx } from "@/db/scope";
+import { ForbiddenError, type OrgCtx } from "@/db/scope";
 import { enqueueCaptureProcessing } from "@/lib/ai/enqueue";
 import { readExif } from "@/lib/geo/exif";
 import { extensionFor, putObject, belongsToOrg, pathnameOf } from "@/lib/storage";
@@ -104,7 +104,7 @@ export async function ingestCapture(
   let thumbUrl: string | null = null;
   let width: number | undefined;
   let height: number | undefined;
-  if (blobUrl && !belongsToOrg(blobUrl, ctx.orgId)) throw new Error("Bestandsverwijzing hoort niet bij deze organisatie.");
+  if (blobUrl && !belongsToOrg(blobUrl, ctx.orgId)) throw new ForbiddenError("Bestandsverwijzing hoort niet bij deze organisatie.");
   if (input.file) {
     const stored = await putObject(`${dir}/${id}-orig.${extensionFor(mime)}`, input.file.buffer, mime);
     blobUrl = stored.url;

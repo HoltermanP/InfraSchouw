@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getLocalDb } from "@/lib/offline/db";
-import { createLocalInspection } from "@/lib/offline/field-store";
+import { createLocalInspection, finishInspection } from "@/lib/offline/field-store";
+import { openFinishItems, skippedFromKeys } from "@/lib/offline/finish";
 import { GlassesBrowserSource } from "@/lib/capture-sources/glasses-browser";
 import { parseGlassesHomeCommand, parseVoiceCommand, VOICE_HELP } from "@/lib/voice/commands";
 import { reverseGeocode } from "@/lib/geo/pdok";
@@ -85,13 +86,15 @@ function Banner({ text }: { text: string | null }) {
   );
 }
 
-function GlassesInspection({ data, inspectionId, onExit, heard }: { data: Bootstrap; inspectionId: string; onExit: () => void; heard: (fn: (text: string) => void) => void }) {
+function GlassesInspection({ data, inspectionId, onExit, heard }: { data: Bootstrap; inspectionId: string; onExit: (message?: string) => void; heard: (fn: (text: string) => void) => void }) {
   const ctl = useInspectionController(data, inspectionId, "glasses-browser");
   const video = useRef<HTMLVideoElement>(null);
   const source = useMemo(() => new GlassesBrowserSource(), []);
   const [banner, setBanner] = useState<string | null>(null);
   const [recordingVideo, setRecordingVideo] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  /** Open items shown after "afronden"; the next "reden …" finishes with that reason. */
+  const [finishOpen, setFinishOpen] = useState<string[] | null>(null);
   const trackRef = useRef<{ lat: number; lon: number; t: number }[]>([]);
   const videoStart = useRef<Date | null>(null);
 
@@ -169,12 +172,29 @@ function GlassesInspection({ data, inspectionId, onExit, heard }: { data: Bootst
         case "help":
           setShowHelp((v) => !v);
           break;
-        case "finish":
-          flash("AFRONDEN OP TELEFOON");
+        case "finish": {
+          if (!ctl.template) break;
+          const open = openFinishItems(ctl.template, ctl.captures, ctl.answers);
+          if (open.keys.length === 0) {
+            await finishInspection(inspectionId, [], null);
+            onExit("✅ SCHOUW AFGEROND");
+          } else {
+            setFinishOpen([...open.missingShots.map((s) => `Foto: ${s.title}`), ...open.openItems.map((c) => `Checklist: ${c.question}`)]);
+          }
           break;
-        default:
-          if (/^(terug|stop schouw|sluiten)$/i.test(text.trim())) onExit();
+        }
+        default: {
+          const t = text.trim();
+          const reason = t.match(/^reden\s+(.{3,})$/i)?.[1];
+          if (finishOpen && reason && ctl.template) {
+            const open = openFinishItems(ctl.template, ctl.captures, ctl.answers);
+            await finishInspection(inspectionId, skippedFromKeys(open.keys, () => reason), null);
+            setFinishOpen(null);
+            onExit("✅ SCHOUW AFGEROND");
+          } else if (finishOpen && /^(annuleer|annuleren|doorgaan)$/i.test(t)) setFinishOpen(null);
+          else if (/^(terug|stop schouw|sluiten)$/i.test(t)) onExit();
           else flash(`? ${text}`);
+        }
       }
     });
   });
@@ -202,7 +222,7 @@ function GlassesInspection({ data, inspectionId, onExit, heard }: { data: Bootst
           </div>
         ) : null}
         <p className="rounded-2xl bg-black/80 p-3 text-xl">
-          Zeg: <b>foto</b> · <b>start video</b> · <b>notitie …</b> · <b>bevinding hoog …</b> · <b>volgende shot</b> · <b>help</b> · <b>terug</b>
+          Zeg: <b>foto</b> · <b>start video</b> · <b>notitie …</b> · <b>bevinding hoog …</b> · <b>volgende shot</b> · <b>afronden</b> · <b>help</b> · <b>terug</b>
         </p>
       </div>
       {showHelp ? (
@@ -212,6 +232,19 @@ function GlassesInspection({ data, inspectionId, onExit, heard }: { data: Bootst
               <b>“{h.say}”</b> — {h.does}
             </p>
           ))}
+        </div>
+      ) : null}
+      {finishOpen ? (
+        <div className="absolute inset-0 z-40 overflow-auto bg-black p-6" data-testid="glasses-finish">
+          <p className="mb-4 text-3xl font-black">Afronden: {finishOpen.length} verplicht punt(en) open</p>
+          <ul className="mb-6 list-disc pl-8 text-2xl text-white">
+            {finishOpen.map((o) => (
+              <li key={o}>{o}</li>
+            ))}
+          </ul>
+          <p className="text-2xl">
+            Zeg <b>“reden …”</b> met de reden om ze over te slaan (bijv. “reden geen toegang tot de ruimte”), of <b>“annuleer”</b> om verder te schouwen.
+          </p>
         </div>
       ) : null}
       <Banner text={banner} />
@@ -276,7 +309,10 @@ export function GlassesApp() {
   if (openId) {
     return (
       <>
-        <GlassesInspection data={data} inspectionId={openId} onExit={() => setOpenId(null)} heard={(fn) => (inspectionHandler.current = fn)} />
+        <GlassesInspection data={data} inspectionId={openId} onExit={(message) => {
+            setOpenId(null);
+            if (message) flash(message);
+          }} heard={(fn) => (inspectionHandler.current = fn)} />
         {lastHeard ? <p className="fixed right-4 bottom-4 left-4 z-50 truncate text-center text-lg text-white/70">“{lastHeard}”</p> : null}
       </>
     );

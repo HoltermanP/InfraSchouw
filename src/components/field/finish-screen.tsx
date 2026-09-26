@@ -5,6 +5,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Check, Eraser, PenLine, Plus } from "lucide-react";
 import { getLocalDb } from "@/lib/offline/db";
 import { finishInspection, saveParticipant } from "@/lib/offline/field-store";
+import { openFinishItems, skippedFromKeys } from "@/lib/offline/finish";
 import { cn } from "@/lib/utils";
 import type { Bootstrap } from "./use-bootstrap";
 import type { FieldRoute } from "./nav";
@@ -86,21 +87,12 @@ export function FinishScreen({ data, inspectionId, go }: { data: Bootstrap; insp
   const template = data.templates.find((t) => t.id === inspection?.templateId);
   if (!inspection || !template) return <p className="p-6 text-center text-white/70">Laden…</p>;
 
-  const missingShots = template.shots.filter((s) => s.required && !captures.some((c) => c.shotId === s.id));
-  const openItems = template.checklist.filter((c) => {
-    if (!c.required) return false;
-    const a = answers.find((x) => x.itemId === c.id);
-    return !a || (a.value === null && !a.skippedReason) || (c.photoRequired && a.captureIds.length === 0 && !a.skippedReason);
-  });
-  const openKeys = [...missingShots.map((s) => `shot:${s.id}`), ...openItems.map((c) => `checklist:${c.id}`)];
+  const { missingShots, openItems, keys: openKeys } = openFinishItems(template, captures, answers);
   const unresolved = openKeys.filter((k) => !reasons[k]?.trim());
 
   async function finish() {
     setBusy(true);
-    const skipped = openKeys.map((k) => {
-      const [kind, refId] = k.split(":") as ["shot" | "checklist", string];
-      return { kind, refId, reason: reasons[k]!.trim() };
-    });
+    const skipped = skippedFromKeys(openKeys, (k) => reasons[k]!.trim());
     await finishInspection(inspectionId, skipped, notes || null);
     go({ view: "inspection", id: inspectionId, step: "vastleggen" }, true);
   }

@@ -38,10 +38,52 @@ test("ingest-API weigert ongeldig of ingetrokken token", async ({ request }) => 
   expect(res.status()).toBe(401);
 });
 
-test("bril-UI laadt en is volledig op spraak ingericht", async ({ page }) => {
+test("bril-UI is volledig met spraak te bedienen: schouw starten, vastleggen, afronden", async ({ page }) => {
+  // Fake Web Speech API: window.__say(text) delivers a final recognition result.
+  await page.addInitScript(() => {
+    type Rec = { onresult: ((e: unknown) => void) | null; onend: (() => void) | null; onerror: unknown; start(): void; stop(): void };
+    const w = window as unknown as { __rec?: Rec; __say?: (t: string) => void; webkitSpeechRecognition?: unknown; SpeechRecognition?: unknown };
+    class FakeRecognition {
+      lang = "nl-NL";
+      continuous = true;
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: unknown = null;
+      constructor() {
+        w.__rec = this as unknown as Rec;
+      }
+      start() {}
+      stop() {}
+    }
+    w.SpeechRecognition = FakeRecognition;
+    w.webkitSpeechRecognition = FakeRecognition;
+    w.__say = (t: string) => w.__rec?.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: t }], { isFinal: true })] });
+  });
+  const say = async (t: string) => {
+    await page.evaluate((text) => (window as unknown as { __say: (x: string) => void }).__say(text), t);
+    await page.waitForTimeout(400);
+  };
   await loginAs(page, "schouwer", "/veld/bril");
   await expect(page.getByRole("heading", { name: "InfraSchouw — bril" })).toBeVisible();
-  await expect(page.getByText(/nieuwe schouw/).first()).toBeVisible();
+  await say("nieuwe schouw calamiteit");
+  await expect(page.getByTestId("glasses-title")).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1500); // camera start
+  await say("foto");
+  await say("notitie kabel ligt ondieper dan verwacht");
+  await say("bevinding hoog mantelbuis gescheurd");
+  await say("meting diepte 45 centimeter");
+  await expect(page.getByText(/[1-9]\d* opnames/)).toBeVisible();
+  await say("afronden");
+  await page.waitForTimeout(300);
+  if (await page.getByTestId("glasses-finish").isVisible()) {
+    await expect(page.getByTestId("glasses-finish")).toContainText("verplicht punt");
+    await say("reden niet vastgelegd via de bril");
+  }
+  // Back on the home screen with a confirmation; nothing is running any more.
+  await expect(page.getByText("SCHOUW AFGEROND")).toBeVisible();
+  await expect(page.getByTestId("glasses-title")).toHaveCount(0);
+  await expect(page.getByText(/^Geen\. Zeg/)).toBeVisible();
 });
 
 test("rollen worden afgedwongen", async ({ page }) => {
