@@ -117,6 +117,9 @@ export const transcriptExtractionSchema = z.object({
       due_suggestion: z.string().nullable(),
     }),
   ),
+  corrected_segments: z
+    .array(z.object({ segment_index: z.number().int(), text: z.string() }))
+    .describe("Alleen segmenten waarin vaktermen verkeerd zijn verstaan, met gecorrigeerde tekst"),
 });
 export type TranscriptExtraction = z.infer<typeof transcriptExtractionSchema>;
 
