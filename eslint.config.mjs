@@ -11,6 +11,11 @@ const eslintConfig = defineConfig([
       "@next/next/no-img-element": "off",
     },
   },
+  {
+    // react-pdf <Image> is not an HTML image (no alt attribute exists).
+    files: ["src/lib/export/pdf.tsx"],
+    rules: { "jsx-a11y/alt-text": "off" },
+  },
   globalIgnores([
     ".next/**",
     "out/**",

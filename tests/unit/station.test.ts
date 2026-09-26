@@ -98,3 +98,15 @@ describe("as-built check", () => {
     expect(asbuiltSummary(rows)).toEqual({ conform: 6, afwijkend: 1, nietVastgesteld: 1 });
   });
 });
+
+import { parseExpectedConfig } from "@/lib/station/expected-import";
+
+describe("expected configuration import", () => {
+  it("parses CSV with aliases", () => {
+    const cfg = parseExpectedConfig("kenmerk;waarde\nRMU;Xiria 3K+1T\nvelden;4\nveldfuncties;kabel|kabel|kabel|trafo\ntrafo kva;630\nrtu;ja");
+    expect(cfg).toMatchObject({ rmu_type: "Xiria 3K+1T", aantal_velden: 4, velden_functies: ["kabel", "kabel", "kabel", "trafo"], trafo_vermogen_kva: 630, rtu_aanwezig: true });
+  });
+  it("parses JSON", () => {
+    expect(parseExpectedConfig('{"trafo_vermogen_kva": 400}').trafo_vermogen_kva).toBe(400);
+  });
+});
