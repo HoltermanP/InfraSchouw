@@ -36,7 +36,7 @@ export function ShareLinksPanel({ reportId, links, canManage }: { reportId: stri
               onClick={() =>
                 run(() => createShareLink(reportId, Number(days), label || null), {
                   onSuccess: (d) => {
-                    setCreated(d.url);
+                    setCreated(new URL(d.path, window.location.origin).toString());
                     setLabel("");
                   },
                 })

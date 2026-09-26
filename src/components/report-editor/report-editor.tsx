@@ -111,7 +111,24 @@ export function ReportEditor(props: {
   const { run, pending } = useAction();
   const [meta, setMeta] = useState<ReportMeta>(props.meta);
   const [dirty, setDirty] = useState(false);
-  const [panel, setPanel] = useState<Panel>(props.initialPanel ?? "fotos");
+  // Saving creates a new version, which remounts the editor (keyed by version);
+  // remember the open side panel per report so it survives that remount.
+  const panelKey = `infraschouw:report-panel:${props.reportId}`;
+  const [panel, setPanelState] = useState<Panel>(() => props.initialPanel ?? readStoredPanel(panelKey) ?? "fotos");
+  const setPanel = useCallback(
+    (p: Panel) => {
+      setPanelState(p);
+      try {
+        sessionStorage.setItem(panelKey, p);
+      } catch {
+        // Storage unavailable (private mode): the panel simply resets on save.
+      }
+    },
+    [panelKey],
+  );
+  useEffect(() => {
+    editorHydrated = true;
+  }, []);
   const [regen, setRegen] = useState<{ key: string; title: string; edited: boolean } | null>(null);
   const [regenInstruction, setRegenInstruction] = useState("");
   const [regenForce, setRegenForce] = useState(false);
@@ -448,4 +465,16 @@ export function ReportEditor(props: {
       </Dialog>
     </ReportEditorContext.Provider>
   );
+}
+
+/** True after the first editor mount; before that, reading storage would cause a hydration mismatch. */
+let editorHydrated = false;
+
+function readStoredPanel(key: string): Panel | null {
+  if (typeof window === "undefined" || !editorHydrated) return null;
+  try {
+    return (sessionStorage.getItem(key) as Panel | null) ?? null;
+  } catch {
+    return null;
+  }
 }

@@ -142,8 +142,9 @@ export async function createShareLink(reportId: string, days: number, label: str
     const [link] = await scoped(ctx).insert(shareLinks, { reportId, tokenHash: hashToken(token), expiresAt, label: label?.slice(0, 100) || null });
     await audit(ctx, "create", "share_link", link!.id, `Deellink aangemaakt (geldig tot ${expiresAt.toISOString().slice(0, 10)})`);
     revalidateReport(report.inspectionId);
-    // The plain token is shown once; only its hash is stored.
-    return { url: `${env.appUrl}/delen/${token}`, expiresAt: expiresAt.toISOString() };
+    // The plain token is shown once; only its hash is stored. The client
+    // prefixes its own origin so the link matches the host the user is on.
+    return { path: `/delen/${token}`, expiresAt: expiresAt.toISOString() };
   }, "Deellink aangemaakt");
 }
 

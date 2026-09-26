@@ -13,6 +13,11 @@ const eslintConfig = defineConfig([
   },
   {
     // react-pdf <Image> is not an HTML image (no alt attribute exists).
+    // CommonJS preload scripts for tsx (see package.json db:* scripts).
+    files: ["scripts/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
     files: ["src/lib/export/pdf.tsx"],
     rules: { "jsx-a11y/alt-text": "off" },
   },

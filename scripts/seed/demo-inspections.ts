@@ -301,7 +301,6 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
   const { org, users } = base;
   const ctxAs = (role: keyof typeof users): OrgCtx => ({ orgId: org.id, userId: users[role].id, role: role === "lezer" ? "lezer" : role });
   const schouwer = ctxAs("schouwer");
-  const pl = ctxAs("projectleider");
   const templates = await getTemplatesFull({ orgId: org.id, userId: null, role: "admin" });
   const tpl = (key: string) => templates.find((t) => t.key === key)!;
   const summary: string[] = [];
