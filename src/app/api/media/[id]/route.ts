@@ -28,6 +28,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/media/[id]">) {
       const share = await resolveShareToken(shareToken);
       if (!share) return jsonError(403, "Deellink is ongeldig, verlopen of ingetrokken.");
       await checkRateLimit("share", share.link.id);
+      if (!capture.inspectionId || capture.inspectionId !== share.report.inspectionId || capture.hiddenInReport) return jsonError(403, "Geen toegang.");
       const [report] = await db.select().from(reports).where(and(eq(reports.id, share.report.id), eq(reports.inspectionId, capture.inspectionId ?? ""))).limit(1);
       if (!report || capture.hiddenInReport) return jsonError(403, "Geen toegang.");
     } else {

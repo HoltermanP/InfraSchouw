@@ -63,7 +63,7 @@ export type ReportModel = {
   inspectionId: string;
 };
 
-async function loadImage(url: string | null | undefined, maxDim = 1400, forcePng = false): Promise<Img | null> {
+async function loadImageRaw(url: string | null | undefined, maxDim = 1400, forcePng = false): Promise<Img | null> {
   if (!url) return null;
   const obj = await getObjectBuffer(url);
   if (!obj) return null;
@@ -99,7 +99,14 @@ function tableFromNode(node: TiptapNode): TableBlock {
  * Build the format-neutral report model from the inspection context and a
  * report version (content + meta).
  */
-export async function buildReportModel(ctx: InspectionContext, content: TiptapDoc, meta: ReportMeta, opts: { versionNumber: number | null; status: ReportStatus; mapSnapshotUrl?: string | null }): Promise<ReportModel> {
+export async function buildReportModel(
+  ctx: InspectionContext,
+  content: TiptapDoc,
+  meta: ReportMeta,
+  opts: { versionNumber: number | null; status: ReportStatus; mapSnapshotUrl?: string | null; loadImages?: boolean },
+): Promise<ReportModel> {
+  const withImages = opts.loadImages !== false;
+  const loadImage = (url: string | null | undefined, maxDim?: number, forcePng?: boolean) => (withImages ? loadImageRaw(url, maxDim, forcePng) : Promise.resolve(null));
   const captureById = new Map(ctx.captures.map((c) => [c.id, c]));
   const imageCache = new Map<string, Promise<Img | null>>();
   const photoRef = async (captureId: string, caption?: string): Promise<PhotoRef | null> => {
@@ -384,6 +391,7 @@ export async function buildReportModel(ctx: InspectionContext, content: TiptapDo
 
   let mapImage: Img | null | undefined;
   const mapBlock = async (): Promise<Block> => {
+    if (!withImages) mapImage = null;
     if (mapImage === undefined) {
       mapImage = opts.mapSnapshotUrl ? await loadImage(opts.mapSnapshotUrl, 2000, true) : null;
       if (!mapImage) {

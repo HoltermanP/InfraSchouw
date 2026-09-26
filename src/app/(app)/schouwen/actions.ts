@@ -11,14 +11,11 @@ import {
   checklistAnswers,
   findingCaptures,
   findings,
-  inspectionParticipants,
   inspections,
   projects,
-  reportExports,
-  reports,
   templateChecklistItems,
 } from "@/db/schema";
-import { orgWhere, scoped } from "@/db/scope";
+import { scoped } from "@/db/scope";
 import { audit, diffFields } from "@/db/queries/audit";
 import { requireCtx } from "@/lib/auth/session";
 import { safeAction, UserError } from "@/lib/action-result";
@@ -310,21 +307,9 @@ export async function deleteInspectionCompletely(inspectionId: string, confirmTi
     const ctx = await requireCtx("admin");
     const insp = await scoped(ctx).getById(inspections, inspectionId);
     if (confirmTitle.trim() !== insp.title.trim()) throw new UserError("De ingevoerde titel komt niet overeen.");
-    const caps = await scoped(ctx).list(captures, eq(captures.inspectionId, inspectionId));
-    const anns = caps.length ? await db.select().from(captureAnnotations).where(and(eq(captureAnnotations.orgId, ctx.orgId), inArray(captureAnnotations.captureId, caps.map((c) => c.id)))) : [];
-    const parts = await scoped(ctx).list(inspectionParticipants, eq(inspectionParticipants.inspectionId, inspectionId));
-    const [report] = await db.select().from(reports).where(orgWhere(reports, ctx, eq(reports.inspectionId, inspectionId)));
-    const exps = report ? await db.select().from(reportExports).where(eq(reportExports.reportId, report.id)) : [];
-    const urls = [
-      ...caps.flatMap((c) => [c.blobUrl, c.thumbUrl, ...(c.meta.keyframes ?? []).map((k) => k.url)]),
-      ...anns.map((a) => a.renderedUrl),
-      ...parts.map((p) => p.signatureUrl),
-      ...exps.map((e) => e.blobUrl),
-      report?.mapSnapshotUrl,
-    ].filter((u): u is string => Boolean(u));
-    await db.delete(inspections).where(orgWhere(inspections, ctx, eq(inspections.id, inspectionId)));
-    await Promise.all([...new Set(urls)].map((u) => deleteObject(u).catch(() => undefined)));
-    await audit(ctx, "delete_gdpr", "inspection", inspectionId, `Schouw "${insp.title}" volledig verwijderd (AVG), ${urls.length} bestanden gewist`);
+    const { deleteInspectionData } = await import("@/lib/privacy");
+    const files = await deleteInspectionData(ctx.orgId, inspectionId);
+    await audit(ctx, "delete_gdpr", "inspection", inspectionId, `Schouw "${insp.title}" volledig verwijderd (AVG), ${files} bestanden gewist`);
     revalidatePath("/schouwen");
     return null;
   }, "Schouw en alle bijbehorende bestanden zijn verwijderd");
