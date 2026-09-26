@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { memberships, organizations, users } from "@/db/schema";
@@ -167,9 +167,7 @@ export async function requireSession(minRole?: Role): Promise<ActiveSession> {
   const session = await getSession();
   if (session.status === "signed-out") redirect(signInPath());
   if (session.status === "no-org") redirect("/organisatie");
-  if (minRole && !roleAtLeast(session.role, minRole)) {
-    throw new ForbiddenError();
-  }
+  if (minRole && !roleAtLeast(session.role, minRole)) forbidden();
   return session;
 }
 

@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["sharp", "@react-pdf/renderer", "exceljs", "pg"],
   experimental: {
     serverActions: { bodySizeLimit: "25mb" },
+    authInterrupts: true,
   },
   async headers() {
     return [
