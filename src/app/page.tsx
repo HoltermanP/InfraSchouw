@@ -7,6 +7,8 @@ import { getSession, signInPath } from "@/lib/auth/session";
 export default async function LandingPage() {
   const session = await getSession();
   if (session.status === "ok") redirect("/dashboard");
+  // Signed in without an organisation: send to the org picker, otherwise the sign-in button loops back here.
+  if (session.status === "no-org") redirect("/organisatie");
   const features = [
     { icon: Camera, title: "Vastleggen in het veld", text: "Foto, video, spraak, metingen, schetsen en QR — ook offline en handsfree." },
     { icon: Zap, title: "AI-verslagvoorstel", text: "Na afronden maakt AI een gestructureerd voorstel met foto's op de juiste plek." },
