@@ -155,7 +155,7 @@ Exports draaien in route handlers (`/api/exports/…`) met `maxDuration` en word
 - **Uploads**: MIME-allowlist, maximale grootte, veilige padnamen (`isSafePathname`), private Blob.
 - **Headers** (`next.config.ts`): `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` en `Permissions-Policy` (camera, microfoon en geolocatie alleen op eigen origin). HSTS wordt door Vercel gezet.
 - **Audit log** voor aanmaken, wijzigen, verwijderen, statusovergangen, exports, deellinks, apparaten en rolwijzigingen (*Instellingen → Audit*).
-- **Privacy (AVG)**: configureerbare bewaartermijn (dagelijkse cron), volledig verwijderen van een schouw inclusief bestanden, en gezichten/kentekens vervagen in de annotatie-editor.
+- **Privacy (AVG)**: configureerbare bewaartermijn (opruimen via *Instellingen*; optioneel als cron), volledig verwijderen van een schouw inclusief bestanden, en gezichten/kentekens vervagen in de annotatie-editor.
 
 ## Tests
 

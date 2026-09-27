@@ -61,11 +61,11 @@ Alle variabelen staan met uitleg in [.env.example](.env.example). Alleen `DATABA
 | `CLERK_WEBHOOK_SECRET` | **verplicht** — endpoint `/api/webhooks/clerk` | gebruikers/orgs worden alleen bij eerste login aangemaakt |
 | `BLOB_READ_WRITE_TOKEN` | **verplicht** — *private* Blob store | opslag op lokale schijf (`.data/uploads`), niet geschikt voor Vercel |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | aanbevolen | rate limiting in geheugen per instantie |
-| `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` | aanbevolen | AI-jobs draaien via `after()` na de response; de cron-sweep vangt achterblijvers op |
+| `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` | aanbevolen | AI-jobs draaien via `after()` na de response; vastgelopen jobs start je opnieuw via *Instellingen* |
 | `OPENAI_API_KEY` | aanbevolen | AI-stappen krijgen status "overgeslagen"; er wordt een basisverslag uit de schouwgegevens gemaakt |
 | `OPENAI_MODEL_VISION`, `OPENAI_MODEL_REPORT`, `OPENAI_MODEL_TRANSCRIBE` | optioneel | standaard `gpt-6-luna`, `gpt-6-astra`, `gpt-4o-transcribe-diarize` |
 | `APP_URL` | **verplicht** — publieke URL, bijv. `https://schouw.example.nl` | QStash-callbacks en lokale upload-URL's kloppen niet |
-| `CRON_SECRET` | **verplicht** | cron-routes weigeren elk verzoek |
+| `CRON_SECRET` | optioneel (alleen als je de cron-routes aanroept) | cron-routes weigeren elk verzoek |
 | `DEMO_MODE` | **`false`** | — |
 | `DATABASE_POOL_MAX` | optioneel (standaard 5) | — |
 
@@ -76,8 +76,8 @@ Alle variabelen staan met uitleg in [.env.example](.env.example). Alleen `DATABA
 3. **Vercel Blob** — Storage → Blob → *private* store koppelen (zet `BLOB_READ_WRITE_TOKEN`).
 4. **Upstash** — Redis-database en QStash koppelen via de Vercel Marketplace (zet de vijf variabelen).
 5. **OpenAI** — API-sleutel met toegang tot de gekozen modellen.
-6. Zet `APP_URL`, `CRON_SECRET` (willekeurige string van 32+ tekens) en `DEMO_MODE=false`.
-7. Deploy. `vercel.json` registreert twee crons: `/api/cron/ai-sweep` (elke 10 min: vastgelopen AI-jobs opnieuw) en `/api/cron/retention` (dagelijks: schouwen verwijderen waarvan de bewaartermijn uit *Instellingen → Privacy* is verstreken).
+6. Zet `APP_URL` en `DEMO_MODE=false`.
+7. Deploy. Er zijn geen Vercel-crons ingesteld (werkt dus ook op het Hobby-plan). Vastgelopen AI-jobs en verlopen schouwen (bewaartermijn uit *Instellingen → Privacy*) ruimt een admin op via *Instellingen*. Wil je dit automatisch, voeg dan in `vercel.json` crons toe voor `/api/cron/ai-sweep` en `/api/cron/retention` en zet `CRON_SECRET` (Pro-plan nodig voor vaker dan dagelijks).
 8. Controleer `/configuratie`: die pagina toont per integratie of die actief is.
 
 Na een schemawijziging: `pnpm db:generate`, commit de migratie in `src/db/migrations`, en draai `pnpm db:migrate` tegen productie vóór of tijdens de deploy.
