@@ -11,6 +11,7 @@ import {
   paragraphs,
   photo,
   photoGrid,
+  referencedCaptureIds,
   section,
   sectionHash,
   table,
@@ -27,7 +28,16 @@ export type BuildContext = {
   template: { name: string; purposeText: string; isStation: boolean; isBilling: boolean; sections: { key: string; title: string }[] };
   project: { number: string; name: string; client: string | null; contractForm: string } | null;
   station: { code: string; name: string } | null;
-  captures: { id: string; type: string; seq: number | null; hiddenInReport: boolean; capturedAt: Date; note: string | null; analysis: { caption: string } | null; shotId: string | null }[];
+  captures: {
+    id: string;
+    type: string;
+    seq: number | null;
+    hiddenInReport: boolean;
+    capturedAt: Date;
+    note: string | null;
+    analysis: { caption: string; description?: string; station_component?: string | null } | null;
+    shotId: string | null;
+  }[];
   findings: { id: string; title: string; category: FindingCategory; priority: "hoog" | "midden" | "laag"; captureIds: string[]; lat: number | null; lon: number | null; description: string }[];
   org: { settings: { export: { findingsGrouping: "thema" | "locatie" } } };
   billingItems: { code: string }[];
@@ -61,6 +71,20 @@ function photoCaption(c: BuildContext["captures"][number]): string {
   return c.analysis?.caption ?? c.note ?? "";
 }
 
+/** Explanation under a photo: the inspector's note leads, then the AI description. */
+function photoNote(c: BuildContext["captures"][number]): string {
+  const parts = [c.note && c.note !== photoCaption(c) ? c.note : null, c.analysis?.description ?? null].filter(Boolean);
+  return parts.join(" ");
+}
+
+function photoNode(c: BuildContext["captures"][number]): TiptapNode {
+  return photo(c.id, photoCaption(c), photoNote(c));
+}
+
+function reportPhotoCaptures(ctx: BuildContext) {
+  return ctx.captures.filter((c) => ["photo", "video", "sketch"].includes(c.type) && !c.hiddenInReport);
+}
+
 function scopeText(ctx: BuildContext): string {
   const parts = [
     ctx.project ? `De schouw is uitgevoerd in het kader van project ${ctx.project.number} – ${ctx.project.name}${ctx.project.client ? ` in opdracht van ${ctx.project.client}` : ""} (${ctx.project.contractForm}).` : "Dit betreft een losse schouw die (nog) niet aan een project is gekoppeld.",
@@ -73,7 +97,7 @@ function scopeText(ctx: BuildContext): string {
 
 /** Findings section without AI: each finding with its photos, then the remaining photos. */
 function baselineFindings(ctx: BuildContext): TiptapNode[] {
-  const photos = ctx.captures.filter((c) => ["photo", "video", "sketch"].includes(c.type) && !c.hiddenInReport);
+  const photos = reportPhotoCaptures(ctx);
   const used = new Set<string>();
   const out: TiptapNode[] = [];
   const groups = new Map<string, BuildContext["findings"]>();
@@ -93,16 +117,25 @@ function baselineFindings(ctx: BuildContext): TiptapNode[] {
       out.push(findingRef(f.id));
       const own = f.captureIds.filter((id) => photos.some((p) => p.id === id));
       own.forEach((id) => used.add(id));
-      if (own.length === 1) {
-        const c = photos.find((p) => p.id === own[0])!;
-        out.push(photo(c.id, photoCaption(c)));
-      } else if (own.length > 1) out.push(photoGrid(own, ""));
+      for (const id of own) out.push(photoNode(photos.find((p) => p.id === id)!));
     }
   }
   const rest = photos.filter((p) => !used.has(p.id));
   if (rest.length) {
     out.push(heading("Overige foto's"));
-    for (let i = 0; i < rest.length; i += 4) out.push(photoGrid(rest.slice(i, i + 4).map((c) => c.id), ""));
+    // Analysed photos get their own figure with explanation; the rest as a compact series.
+    const plain: string[] = [];
+    const flush = () => {
+      for (let i = 0; i < plain.length; i += 4) out.push(photoGrid(plain.slice(i, i + 4), ""));
+      plain.length = 0;
+    };
+    for (const c of rest) {
+      if (c.analysis || c.note) {
+        flush();
+        out.push(photoNode(c));
+      } else plain.push(c.id);
+    }
+    flush();
   }
   return out;
 }
@@ -147,7 +180,8 @@ function newStates(d: TiptapDoc, aiGenerated: boolean, at: string): Record<strin
   const states: Record<string, SectionState> = {};
   for (const s of getSections(d)) {
     const key = String(s.attrs?.key);
-    states[key] = { key, title: String(s.attrs?.title ?? key), aiHash: aiGenerated ? sectionHash(s) : null, generatedAt: aiGenerated ? at : null };
+    const hash = sectionHash(s);
+    states[key] = { key, title: String(s.attrs?.title ?? key), aiHash: aiGenerated ? hash : null, generatedAt: aiGenerated ? at : null, baseHash: aiGenerated ? null : hash };
   }
   return states;
 }
@@ -176,7 +210,7 @@ export function blocksToNodes(blocks: ReportBlock[], findingIdByIndex: (i: numbe
         out.push(...paragraphs(b.text));
         break;
       case "photo":
-        if (validCaptureIds.has(b.capture_id)) out.push(photo(b.capture_id, b.caption));
+        if (validCaptureIds.has(b.capture_id)) out.push(photo(b.capture_id, b.caption, b.explanation));
         break;
       case "photo_grid": {
         const ids = b.capture_ids.filter((id) => validCaptureIds.has(id));
@@ -198,6 +232,59 @@ export function blocksToNodes(blocks: ReportBlock[], findingIdByIndex: (i: numbe
         if (id) out.push(findingRef(id));
         break;
       }
+    }
+  }
+  return out;
+}
+
+/**
+ * Every report photo must appear in the document. Photos the AI did not place
+ * go directly after the finding they belong to, into the station section for
+ * station components, or otherwise under "Overige foto's" in the findings.
+ */
+export function placeMissingPhotos(ctx: BuildContext, sections: TiptapNode[], findingCaptures: Map<string, string[]>): TiptapNode[] {
+  const placed = new Set(sections.flatMap((s) => referencedCaptureIds(s)));
+  const missing = reportPhotoCaptures(ctx).filter((c) => !placed.has(c.id));
+  if (missing.length === 0) return sections;
+  const byId = new Map(missing.map((c) => [c.id, c]));
+  const out = sections.map((s) => ({ ...s, content: [...(s.content ?? [])] }));
+  const take = (id: string) => {
+    const c = byId.get(id);
+    if (c) byId.delete(id);
+    return c;
+  };
+
+  // 1. After the finding the photo belongs to (behind photos already there).
+  for (const s of out) {
+    for (let i = 0; i < s.content.length; i++) {
+      const n = s.content[i]!;
+      if (n.type !== "findingRef") continue;
+      const own = (findingCaptures.get(String(n.attrs?.findingId)) ?? []).map(take).filter((c): c is NonNullable<typeof c> => Boolean(c));
+      if (own.length === 0) continue;
+      let at = i + 1;
+      while (at < s.content.length && (s.content[at]!.type === "photo" || s.content[at]!.type === "photoGrid")) at++;
+      s.content.splice(at, 0, ...own.map(photoNode));
+      i = at + own.length - 1;
+    }
+  }
+
+  // 2. Station photos into the station section, before its data blocks.
+  const station = out.find((s) => s.attrs?.key === "station");
+  if (station) {
+    const own = [...byId.values()].filter((c) => c.analysis?.station_component).map((c) => take(c.id)!);
+    if (own.length) {
+      const at = station.content.findIndex((n) => n.type === "dataBlock");
+      station.content.splice(at === -1 ? station.content.length : at, 0, ...own.map(photoNode));
+    }
+  }
+
+  // 3. The rest under "Overige foto's" in the findings (or the first free-text section).
+  const rest = [...byId.values()];
+  if (rest.length) {
+    const target = out.find((s) => s.attrs?.key === "bevindingen") ?? out.find((s) => !DATA_SECTION_BLOCKS[String(s.attrs?.key)] && s.attrs?.key !== "samenvatting") ?? out.at(-1);
+    if (target) {
+      const at = target.content.findIndex((n) => n.type === "dataBlock");
+      target.content.splice(at === -1 ? target.content.length : at, 0, heading("Overige foto's"), ...rest.map(photoNode));
     }
   }
   return out;
@@ -238,7 +325,12 @@ export function buildReportFromDraft(
     }
     return section(key, byKey.get(key)?.title ?? title, withDataBlocks(key, nodes));
   });
-  const d = doc(sections);
+  const findingCaptures = new Map<string, string[]>(ctx.findings.map((f) => [f.id, f.captureIds]));
+  draft.findings.forEach((f, i) => {
+    const id = findingIds[i];
+    if (id) findingCaptures.set(id, [...new Set([...(findingCaptures.get(id) ?? []), ...f.capture_ids])]);
+  });
+  const d = doc(placeMissingPhotos(ctx, sections, findingCaptures));
   const resolveFindingRefs = (ids: string[]) =>
     ids.map((x) => (/^\d+$/.test(x) ? lookup(Number(x)) : ctx.findings.some((f) => f.id === x) ? x : null)).filter((x): x is string => Boolean(x));
   const keyPoints: KeyPoint[] = draft.key_points.map((kp, i) => ({
@@ -269,8 +361,11 @@ export function buildReportFromDraft(
 /** True when a section differs from what the AI last generated (i.e. edited by hand). */
 export function isSectionEdited(node: TiptapNode, state: SectionState | undefined): boolean {
   if (!state) return true;
-  if (state.aiHash === null) return true;
-  return sectionHash(node) !== state.aiHash;
+  const hash = sectionHash(node);
+  if (state.aiHash !== null && hash === state.aiHash) return false;
+  // An untouched baseline section (no AI yet) may be replaced by the AI proposal.
+  if (state.baseHash && hash === state.baseHash) return false;
+  return true;
 }
 
 /**

@@ -8,12 +8,13 @@ import { reportSystemPrompt } from "@/lib/ai/prompts";
 import { structuredCall } from "@/lib/ai/structured";
 import { sourcesContent } from "@/lib/ai/sources";
 import { DeferJob, SkipJob } from "@/lib/ai/runner";
-import { loadInspectionContext, type InspectionContext } from "@/lib/report/context";
+import { loadInspectionContext, reportPhotos, type InspectionContext } from "@/lib/report/context";
 import { buildReportFromDraft, mergeGenerated } from "@/lib/report/build";
 import { ensureBaselineReport, ensureReport, saveReportVersion } from "@/lib/report/service";
 import { mergeAiDescription, pruneCaptureIds } from "@/lib/station/merge";
 import { getStationDescription, runAsbuiltCheck, saveStationDescription } from "@/lib/station/service";
 import { audit } from "@/db/queries/audit";
+import { enqueueJob } from "@/lib/ai/enqueue";
 import type { OrgCtx } from "@/db/scope";
 import type { JobContext, JobOutcome } from "./types";
 
@@ -164,11 +165,25 @@ export async function processReportSynthesis(ctx: JobContext): Promise<JobOutcom
     throw new SkipJob(ctx.openai ? "Verslag-synthese staat uit — basisverslag gemaakt uit de vastgelegde gegevens." : "AI overgeslagen (geen OpenAI-sleutel) — basisverslag gemaakt uit de vastgelegde gegevens.");
   }
 
+  let ictx = await loadInspectionContext(ctx.org.id, inspectionId);
+  if (!ictx) throw new SkipJob("Schouw bestaat niet meer.");
+
   const pending = await pendingCaptureJobs(ctx.org.id, inspectionId);
   if (pending > 0) throw new DeferJob(`Wacht op ${pending} capture-analyse(s).`, 20);
 
-  const ictx = await loadInspectionContext(ctx.org.id, inspectionId);
-  if (!ictx) throw new SkipJob("Schouw bestaat niet meer.");
+  // Every report photo is analysed first so its analysis is input for the report. Photos
+  // without an analysis (e.g. uploaded before AI was on) get one attempt per synthesis job.
+  const unanalysed = ctx.org.settings.ai.captureAnalysis ? reportPhotos(ictx).filter((c) => !c.analysis && c.blobUrl) : [];
+  for (const c of unanalysed) {
+    await enqueueJob(orgCtx, "capture_analysis", { captureId: c.id, inspectionId }, `capture_analysis:${c.id}:${ctx.job.id}`);
+  }
+  if (unanalysed.length) {
+    const started = await pendingCaptureJobs(ctx.org.id, inspectionId);
+    if (started > 0) throw new DeferJob(`Wacht op analyse van ${started} foto('s).`, 20);
+    // Jobs that ran inline are already done: reload so their analyses are included.
+    ictx = (await loadInspectionContext(ctx.org.id, inspectionId)) ?? ictx;
+  }
+
   if (ictx.report && (ictx.report.status === "definitief" || ictx.report.lockedAt)) {
     throw new SkipJob("Het verslag is definitief en vergrendeld; maak eerst een herziene versie.");
   }

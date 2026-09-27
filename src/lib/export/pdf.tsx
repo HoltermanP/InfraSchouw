@@ -41,6 +41,7 @@ function makeStyles(primary: string, accent: string) {
     photo: { maxHeight: 300, objectFit: "contain" },
     caption: { fontSize: 8.5, marginTop: 3, color: "#374151" },
     captionMeta: { fontSize: 7.5, color: "#6b7280" },
+    photoNote: { fontSize: 9, marginTop: 3, lineHeight: 1.35 },
     grid: { flexDirection: "row", flexWrap: "wrap", marginVertical: 6, marginHorizontal: -4 },
     gridItem: { width: "50%", paddingHorizontal: 4, marginBottom: 8 },
     gridPhoto: { width: "100%", height: 170, objectFit: "cover" },
@@ -92,6 +93,7 @@ function PhotoFigure({ p, s }: { p: PhotoRef; s: Styles }) {
         {p.caption ? ` — ${safe(p.caption)}` : ""}
       </Text>
       <Text style={s.captionMeta}>{safe(p.meta)}</Text>
+      {p.note ? <Text style={s.photoNote}>{safe(p.note)}</Text> : null}
     </View>
   );
 }

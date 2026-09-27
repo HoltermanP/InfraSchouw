@@ -23,6 +23,7 @@ export default async function ReportPage(props: PageProps<"/schouwen/[id]/versla
   const ctx = await loadInspectionContext(session.org.id, id);
   if (!ctx) notFound();
 
+  const aiReport = env.openai.enabled && session.org.settings.ai.reportSynthesis;
   if (!ctx.report || !ctx.currentVersion) {
     return (
       <PageBody>
@@ -32,11 +33,11 @@ export default async function ReportPage(props: PageProps<"/schouwen/[id]/versla
           <p className="text-sm text-muted-foreground">
             {ctx.inspection.status === "lopend"
               ? "Het verslagvoorstel wordt gemaakt zodra de schouw is afgerond."
-              : env.openai.enabled
-                ? "De AI maakt het verslagvoorstel; dit kan enkele minuten duren. Je kunt ook direct een basisverslag maken uit de vastgelegde gegevens."
+              : aiReport
+                ? "De AI analyseert de foto's en maakt het verslagvoorstel, met elke foto en toelichting op de juiste plek. Het verslag wordt direct aangemaakt uit de vastgelegde gegevens en aangevuld zodra de AI klaar is (enkele minuten)."
                 : "AI is niet geconfigureerd. Maak een basisverslag uit de vastgelegde gegevens en werk het verder uit in de editor."}
           </p>
-          {roleAtLeast(session.role, "schouwer") ? <CreateReportButton inspectionId={id} /> : null}
+          {roleAtLeast(session.role, "schouwer") ? <CreateReportButton inspectionId={id} ai={aiReport && ctx.inspection.status !== "lopend"} /> : null}
         </div>
       </PageBody>
     );
@@ -107,7 +108,7 @@ export default async function ReportPage(props: PageProps<"/schouwen/[id]/versla
         accessCount: l.accessCount,
         createdAt: l.createdAt.toISOString(),
       }))}
-      aiEnabled={env.openai.enabled && session.org.settings.ai.reportSynthesis}
+      aiEnabled={aiReport}
       initialPanel={sp.delen ? "delen" : undefined}
     />
   );

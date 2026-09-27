@@ -30,7 +30,7 @@ import { answerLabel } from "@/components/inspections/checklist-labels";
 
 export type Run = { text: string; bold?: boolean; italic?: boolean; underline?: boolean };
 export type Img = { data: Buffer; format: "jpg" | "png"; width: number; height: number };
-export type PhotoRef = { captureId: string; nr: number | null; caption: string; meta: string; image: Img | null };
+export type PhotoRef = { captureId: string; nr: number | null; caption: string; note: string; meta: string; image: Img | null };
 export type TableBlock = { type: "table"; columns: string[]; rows: string[][]; caption?: string | null; widths?: number[]; colorColumn?: { index: number; colors: (string | null)[] } };
 
 export type Block =
@@ -109,7 +109,7 @@ export async function buildReportModel(
   const loadImage = (url: string | null | undefined, maxDim?: number, forcePng?: boolean) => (withImages ? loadImageRaw(url, maxDim, forcePng) : Promise.resolve(null));
   const captureById = new Map(ctx.captures.map((c) => [c.id, c]));
   const imageCache = new Map<string, Promise<Img | null>>();
-  const photoRef = async (captureId: string, caption?: string): Promise<PhotoRef | null> => {
+  const photoRef = async (captureId: string, caption?: string, note?: string): Promise<PhotoRef | null> => {
     const c = captureById.get(captureId);
     if (!c) return null;
     const src = c.type === "video" ? (c.meta.keyframes?.[0]?.url ?? c.thumbUrl) : c.blobUrl;
@@ -120,7 +120,7 @@ export async function buildReportModel(
       c.heading !== null ? `richting ${headingLabel(c.heading)}` : null,
       c.type === "video" ? "(still uit video)" : null,
     ].filter(Boolean);
-    return { captureId, nr: c.seq, caption: caption || c.analysis?.caption || c.note || "", meta: metaParts.join(" · "), image: await imageCache.get(captureId)! };
+    return { captureId, nr: c.seq, caption: caption || c.analysis?.caption || c.note || "", note: note ?? "", meta: metaParts.join(" · "), image: await imageCache.get(captureId)! };
   };
   const findingNr = new Map(ctx.findings.map((f, i) => [f.id, i + 1]));
 
@@ -428,7 +428,7 @@ export async function buildReportModel(
           out.push({ type: "quote", runs: runsOf(n) });
           break;
         case "photo": {
-          const p = await photoRef(String(n.attrs?.captureId), String(n.attrs?.caption ?? ""));
+          const p = await photoRef(String(n.attrs?.captureId), String(n.attrs?.caption ?? ""), String(n.attrs?.note ?? ""));
           if (p && !captureById.get(p.captureId)?.hiddenInReport) out.push({ type: "photo", photo: p });
           break;
         }

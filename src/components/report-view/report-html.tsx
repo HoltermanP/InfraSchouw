@@ -51,6 +51,7 @@ function BlockHtml({ b, photoSrc, mapSrc }: { b: Block; photoSrc: (captureId: st
             <strong>Foto {b.photo.nr ?? "–"}</strong>
             {b.photo.caption ? ` — ${b.photo.caption}` : ""}
             <span className="block text-xs text-muted-foreground">{b.photo.meta}</span>
+            {b.photo.note ? <span className="mt-1 block">{b.photo.note}</span> : null}
           </figcaption>
         </figure>
       );

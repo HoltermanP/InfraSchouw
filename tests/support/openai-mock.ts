@@ -62,7 +62,7 @@ export function createOpenAiMock(opts: { invalidCaptureId?: string } = {}) {
             summary: "Samenvatting van de test.",
             key_points: [{ title: "Kabel te ondiep", description: "Dieper leggen", priority: "hoog", category: "kwaliteit", finding_ids: ["0"], capture_ids: [a] }],
             sections: [
-              { key: "bevindingen", title: "Bevindingen", blocks: [{ type: "paragraph", text: "De kabel ligt te ondiep." }, { type: "photo", capture_id: a, caption: "Sleuf" }, { type: "finding_ref", finding_index: 0 }, { type: "photo_grid", capture_ids: [b, opts.invalidCaptureId ?? "00000000-0000-4000-8000-000000000000"], caption: null }] },
+              { key: "bevindingen", title: "Bevindingen", blocks: [{ type: "paragraph", text: "De kabel ligt te ondiep." }, { type: "photo", capture_id: a, caption: "Sleuf", explanation: "Open sleuf; de kabel ligt zichtbaar ondiep." }, { type: "finding_ref", finding_index: 0 }, { type: "photo_grid", capture_ids: [b, opts.invalidCaptureId ?? "00000000-0000-4000-8000-000000000000"], caption: null }] },
             ],
             findings: [{ id: null, title: "Kabel te ondiep", description: "MS-kabel op 65 cm", location: null, priority: "hoog", category: "kwaliteit", capture_ids: [a, "11111111-1111-4111-8111-111111111111"], recommendation: "Dieper leggen tot 80 cm" }],
             actions: [{ description: "Herstel diepte", owner_suggestion: "Aannemer", due_suggestion: "2026-10-01", finding_ids: ["0"] }],

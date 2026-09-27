@@ -50,7 +50,8 @@ function image(img: Img, maxWidthPx: number, maxHeightPx = 420) {
 function photoCaption(p: PhotoRef): Paragraph[] {
   return [
     new Paragraph({ children: [new TextRun({ text: `Foto ${p.nr ?? "–"}`, bold: true, size: 18 }), new TextRun({ text: p.caption ? ` — ${p.caption}` : "", size: 18 })], spacing: { after: 0 } }),
-    new Paragraph({ children: [new TextRun({ text: p.meta, size: 16, color: "6B7280" })], spacing: { after: 160 } }),
+    new Paragraph({ children: [new TextRun({ text: p.meta, size: 16, color: "6B7280" })], spacing: { after: p.note ? 60 : 160 } }),
+    ...(p.note ? [new Paragraph({ children: [new TextRun({ text: p.note, size: 18 })], spacing: { after: 160 } })] : []),
   ];
 }
 

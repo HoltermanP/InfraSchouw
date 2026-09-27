@@ -99,6 +99,18 @@ function PhotoView({ node, updateAttributes, deleteNode, selected }: ReactNodeVi
               aria-label="Bijschrift"
             />
           </figcaption>
+          {!ctx.readOnly || node.attrs.note ? (
+            <textarea
+              className="mt-1 w-full resize-y rounded border border-transparent bg-transparent text-sm text-muted-foreground outline-none field-sizing-content focus:border-border"
+              value={String(node.attrs.note ?? "")}
+              placeholder={c?.analysis?.description ?? "Toelichting bij de foto"}
+              onChange={(e) => updateAttributes({ note: e.target.value })}
+              readOnly={ctx.readOnly}
+              rows={2}
+              aria-label="Toelichting"
+              data-testid="report-photo-note"
+            />
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {c ? new Date(c.capturedAt).toLocaleString("nl-NL") : ""}
             {c?.rdX ? ` · RD ${Math.round(c.rdX)}, ${Math.round(c.rdY!)}` : ""}
@@ -128,7 +140,7 @@ export const Photo = Node.create({
   atom: true,
   draggable: true,
   addAttributes() {
-    return { captureId: { default: null }, caption: { default: "" } };
+    return { captureId: { default: null }, caption: { default: "" }, note: { default: "" } };
   },
   parseHTML() {
     return [{ tag: "figure[data-capture-id]" }];

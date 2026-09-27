@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { aiJobs, captures, type AiJobInput, type Capture } from "@/db/schema";
 import type { OrgCtx } from "@/db/scope";
@@ -48,6 +48,23 @@ export async function enqueueInspectionProcessing(ctx: OrgCtx, inspectionId: str
     .where(and(eq(captures.orgId, ctx.orgId), eq(captures.inspectionId, inspectionId), inArray(captures.type, ["photo", "sketch", "video", "audio"])));
   for (const c of rows) await enqueueCaptureProcessing(ctx, c);
   return enqueueJob(ctx, "report_synthesis", { inspectionId }, `report_synthesis:${inspectionId}:${Date.now()}`);
+}
+
+/** Start photo analysis + report synthesis unless a synthesis for this inspection is already queued or running. */
+export async function ensureInspectionProcessing(ctx: OrgCtx, inspectionId: string) {
+  const [running] = await db
+    .select({ id: aiJobs.id })
+    .from(aiJobs)
+    .where(
+      and(
+        eq(aiJobs.orgId, ctx.orgId),
+        eq(aiJobs.type, "report_synthesis"),
+        inArray(aiJobs.status, ["queued", "running"]),
+        sql`${aiJobs.inputRef}->>'inspectionId' = ${inspectionId}`,
+      ),
+    )
+    .limit(1);
+  return running?.id ?? enqueueInspectionProcessing(ctx, inspectionId);
 }
 
 export async function enqueueReportSynthesis(ctx: OrgCtx, inspectionId: string, opts: { force?: boolean } = {}) {

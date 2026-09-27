@@ -40,7 +40,9 @@ export const REPORT_RULES = `Regels (strikt):
 - Beweer alleen wat uit de bronnen blijkt. Bij twijfel: zet het in open_questions of geef een lage confidence.
 - Elke bewering over de installatie of over hoeveelheden verwijst naar minstens één capture_id uit de bronnen.
 - Gebruik uitsluitend capture_ids die in de bronnen voorkomen. Verzin nooit id's.
-- Plaats foto's in de sectie waar ze inhoudelijk horen (als photo- of photo_grid-blok), niet als losse bijlage.
+- Plaats foto's in de sectie waar ze inhoudelijk horen, direct na de alinea of finding_ref die ze onderbouwen, niet als losse bijlage.
+- Gebruik de foto-analyses (analyse.beschrijving, mogelijke_bevindingen, typeplaat, ocr) als bron voor de tekst en neem bevindingen uit foto's over.
+- Elke niet-verborgen foto komt precies één keer in het verslag. Gebruik per foto een photo-blok met een kort bijschrift (caption) en een toelichting (explanation): 2-4 zinnen over wat zichtbaar is en wat dat betekent voor de bevinding of de tekst ervoor. Gebruik photo_grid alleen voor een reeks vergelijkbare overzichtsfoto's zonder eigen boodschap.
 - Schrijf zakelijk, kort en in het Nederlands. Geen marketingtaal, geen superlatieven.
 - Tekstnotities en checklistantwoorden van de schouwer zijn leidend boven eigen interpretatie van foto's.
 - Prioriteit hoog alleen bij veiligheidsrisico's, directe schade of contractuele non-conformiteit.`;

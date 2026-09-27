@@ -35,7 +35,7 @@ const draft: ReportDraft = {
   title: "Verslag",
   summary: "AI-samenvatting.",
   key_points: [{ title: "Diepte", description: "Te ondiep", priority: "hoog", category: "kwaliteit", finding_ids: ["0"], capture_ids: ["c1", "bestaat-niet"] }],
-  sections: [{ key: "bevindingen", title: "Bevindingen", blocks: [{ type: "paragraph", text: "Tekst." }, { type: "photo", capture_id: "c2", caption: "Boom" }, { type: "finding_ref", finding_index: 0 }] }],
+  sections: [{ key: "bevindingen", title: "Bevindingen", blocks: [{ type: "paragraph", text: "Tekst." }, { type: "photo", capture_id: "c2", caption: "Boom", explanation: "Boom staat binnen de kroonprojectie." }, { type: "finding_ref", finding_index: 0 }] }],
   findings: [],
   actions: [],
   station: null,
@@ -77,6 +77,35 @@ describe("report building", () => {
     expect(JSON.stringify(sectionByKey(merged.content, "samenvatting"))).toContain("Nieuwe samenvatting.");
     const forced = mergeGenerated(edited, second, { force: true });
     expect(JSON.stringify(sectionByKey(forced.content, "bevindingen"))).not.toContain("Handmatig herschreven.");
+  });
+
+  it("places AI photos with their explanation and puts unplaced photos after their finding", () => {
+    const { content } = buildReportFromDraft(ctx, draft, ["f1"], new Set(["c1", "c2"]), { jobId: "j", model: "m" });
+    const nodes = sectionByKey(content, "bevindingen")!.content!;
+    const boom = nodes.find((n) => n.type === "photo" && n.attrs?.captureId === "c2")!;
+    expect(boom.attrs?.note).toBe("Boom staat binnen de kroonprojectie.");
+    // c1 was not placed by the AI but belongs to finding f1: directly after its finding_ref.
+    const at = nodes.findIndex((n) => n.type === "findingRef");
+    expect(nodes[at + 1]).toMatchObject({ type: "photo", attrs: { captureId: "c1", caption: "Sleuf" } });
+    expect(referencedCaptureIds(content)).not.toContain("c3");
+  });
+
+  it("puts photos without a finding under 'Overige foto's' with the analysis as explanation", () => {
+    const withAnalysis: BuildContext = { ...ctx, captures: [...ctx.captures, { id: "c4", type: "photo", seq: 4, hiddenInReport: false, capturedAt: new Date(), note: null, analysis: { caption: "Klinkers", description: "Herstraat klinkerwerk." }, shotId: null }] };
+    const { content } = buildReportFromDraft(withAnalysis, draft, ["f1"], new Set(["c1", "c2", "c4"]), { jobId: "j", model: "m" });
+    const text = JSON.stringify(sectionByKey(content, "bevindingen"));
+    expect(text).toContain("Overige foto's");
+    expect(text).toContain('"note":"Herstraat klinkerwerk."');
+  });
+
+  it("AI proposal replaces untouched baseline sections but keeps edited ones", () => {
+    const base = buildBaselineReport(ctx);
+    expect(isSectionEdited(sectionByKey(base.content, "bevindingen")!, base.meta.sections.bevindingen)).toBe(false);
+    const edited = { content: replaceSection(base.content, "doel_scope", section("doel_scope", "Doel en scope", [paragraph("Eigen tekst.")])), meta: base.meta };
+    const generated = buildReportFromDraft(ctx, draft, ["f1"], new Set(["c1", "c2"]), { jobId: "j", model: "m" });
+    const merged = mergeGenerated(edited, generated);
+    expect(merged.kept).toEqual(["doel_scope"]);
+    expect(JSON.stringify(sectionByKey(merged.content, "samenvatting"))).toContain("AI-samenvatting.");
   });
 
   it("section hash ignores the title", () => {

@@ -113,6 +113,7 @@ export async function renderBillingPdf(ctx: OrgCtx, projectId: string): Promise<
           captureId: p.id,
           nr: p.seq,
           caption: `${r.inspection.title}`,
+          note: "",
           meta: `${fmtDate(p.capture.capturedAt)}${p.capture.rdX ? ` · RD ${Math.round(p.capture.rdX)}, ${Math.round(p.capture.rdY!)}` : ""}`,
           image: { data: out.data, format: "jpg", width: out.info.width, height: out.info.height },
         });

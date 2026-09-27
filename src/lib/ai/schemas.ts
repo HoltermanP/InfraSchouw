@@ -125,7 +125,12 @@ export type TranscriptExtraction = z.infer<typeof transcriptExtractionSchema>;
 
 export const reportBlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("paragraph"), text: z.string() }),
-  z.object({ type: z.literal("photo"), capture_id: z.string(), caption: z.string() }),
+  z.object({
+    type: z.literal("photo"),
+    capture_id: z.string(),
+    caption: z.string().describe("Kort bijschrift (één zin)"),
+    explanation: z.string().describe("Toelichting (2-4 zinnen): wat is zichtbaar en wat betekent dit voor de tekst ervoor"),
+  }),
   z.object({ type: z.literal("photo_grid"), capture_ids: z.array(z.string()), caption: z.string().nullable() }),
   z.object({
     type: z.literal("table"),

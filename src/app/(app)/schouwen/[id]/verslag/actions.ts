@@ -4,14 +4,14 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { reports, reportVersions, shareLinks } from "@/db/schema";
+import { inspections, reports, reportVersions, shareLinks } from "@/db/schema";
 import { orgWhere, scoped, ForbiddenError } from "@/db/scope";
 import { audit } from "@/db/queries/audit";
-import { requireCtx } from "@/lib/auth/session";
+import { getSession, requireCtx } from "@/lib/auth/session";
 import { safeAction, UserError } from "@/lib/action-result";
 import { REPORT_TRANSITIONS, roleAtLeast, type ReportStatus } from "@/lib/domain";
 import { saveReportVersion, ensureBaselineReport } from "@/lib/report/service";
-import { enqueueSectionRegeneration } from "@/lib/ai/enqueue";
+import { enqueueSectionRegeneration, ensureInspectionProcessing } from "@/lib/ai/enqueue";
 import { env } from "@/lib/env";
 import type { ReportMeta, TiptapDoc } from "@/lib/report/types";
 import { archiveFinalPdf } from "@/lib/export/archive";
@@ -34,7 +34,7 @@ const metaSchema = z
       }),
     ),
     openQuestions: z.array(z.object({ id: z.string(), question: z.string(), answer: z.string().nullable(), resolved: z.boolean() })),
-    sections: z.record(z.string(), z.object({ key: z.string(), title: z.string(), aiHash: z.string().nullable(), generatedAt: z.string().nullable() })),
+    sections: z.record(z.string(), z.object({ key: z.string(), title: z.string(), aiHash: z.string().nullable(), generatedAt: z.string().nullable(), baseHash: z.string().nullable().optional() })),
     generatedBy: z.object({ jobId: z.string().nullable(), model: z.string(), at: z.string() }).nullable(),
   })
   .passthrough();
@@ -122,12 +122,21 @@ export async function regenerateSection(reportId: string, sectionKey: string, in
   }, "Sectie wordt opnieuw gegenereerd…");
 }
 
+/**
+ * Create the report right away from the recorded data and, when AI is on,
+ * let the AI analyse the photos and replace it with a proposal (untouched
+ * sections are replaced; photos placed in context with an explanation).
+ */
 export async function createBaselineReport(inspectionId: string) {
   return safeAction(async () => {
     const ctx = await requireCtx("schouwer");
+    const insp = await scoped(ctx).getById(inspections, inspectionId);
     const report = await ensureBaselineReport(ctx, inspectionId);
+    const session = await getSession();
+    const withAi = env.openai.enabled && session.status === "ok" && session.org.settings.ai.reportSynthesis && insp.status !== "lopend";
+    if (withAi) await ensureInspectionProcessing(ctx, inspectionId);
     revalidateReport(inspectionId);
-    return { reportId: report?.id ?? null };
+    return { reportId: report?.id ?? null, withAi };
   }, "Verslag aangemaakt");
 }
 

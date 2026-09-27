@@ -74,6 +74,8 @@ describe.skipIf(!hasDb)("AI pipeline (OpenAI gemockt met MSW)", () => {
     expect(used).toContain(ids.photo1);
     expect(used).toContain(ids.photo2);
     expect(used).not.toContain("00000000-0000-4000-8000-000000000000");
+    const sleuf = bevindingen.content!.find((n) => n.type === "photo" && n.attrs?.captureId === ids.photo1);
+    expect(sleuf?.attrs?.note).toBe("Open sleuf; de kabel ligt zichtbaar ondiep.");
     expect(version!.meta.keyPoints[0]).toMatchObject({ title: "Kabel te ondiep", source: "ai", accepted: false });
     expect(version!.meta.openQuestions).toHaveLength(1);
     expect(getSections(version!.content).map((s) => s.attrs?.key)).toContain("samenvatting");

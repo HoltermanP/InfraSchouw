@@ -48,6 +48,8 @@ export function sourcesJson(ctx: InspectionContext) {
         ? {
             bijschrift: c.analysis.caption,
             beschrijving: c.analysis.description,
+            trefwoorden: c.analysis.tags,
+            objecten: c.analysis.detected_objects,
             mogelijke_bevindingen: c.analysis.possible_findings,
             typeplaat: c.analysis.nameplate,
             ocr: c.analysis.ocr_text,
@@ -79,7 +81,7 @@ export function sourcesJson(ctx: InspectionContext) {
 }
 
 /** Sources + a selection of photos (low detail) as model input. */
-export async function sourcesContent(ctx: InspectionContext, maxImages = 16): Promise<ResponseInputContent[]> {
+export async function sourcesContent(ctx: InspectionContext, maxImages = 30): Promise<ResponseInputContent[]> {
   const content: ResponseInputContent[] = [{ type: "input_text", text: `BRONNEN (JSON):\n${JSON.stringify(sourcesJson(ctx))}` }];
   const photos = reportPhotos(ctx).filter((c) => c.type !== "video" && (c.thumbUrl || c.blobUrl));
   const step = photos.length > maxImages ? photos.length / maxImages : 1;

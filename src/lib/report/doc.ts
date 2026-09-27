@@ -50,7 +50,7 @@ export function paragraphs(value: string | null | undefined): TiptapNode[] {
 }
 
 export const heading = (value: string, level = 3): TiptapNode => ({ type: "heading", attrs: { level }, content: [text(value)] });
-export const photo = (captureId: string, caption = ""): TiptapNode => ({ type: "photo", attrs: { captureId, caption } });
+export const photo = (captureId: string, caption = "", note = ""): TiptapNode => ({ type: "photo", attrs: { captureId, caption, note } });
 export const photoGrid = (captureIds: string[], caption = ""): TiptapNode => ({ type: "photoGrid", attrs: { captureIds, caption } });
 export const mapSnapshot = (bbox: number[] | null = null): TiptapNode => ({ type: "mapSnapshot", attrs: { bbox } });
 export const findingRef = (findingId: string): TiptapNode => ({ type: "findingRef", attrs: { findingId } });
