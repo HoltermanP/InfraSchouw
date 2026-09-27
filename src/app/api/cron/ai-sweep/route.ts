@@ -3,7 +3,7 @@ import { isAuthorizedCron } from "@/lib/cron";
 import { jsonError } from "@/lib/api";
 import { processQueuedJobs } from "@/lib/ai/sweep";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 export async function GET(req: Request) {
   if (!isAuthorizedCron(req)) return jsonError(401, "Niet geautoriseerd.");

@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { jsonError } from "@/lib/api";
 import { runJob } from "@/lib/ai/runner";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 /** QStash callback: runs one AI job. Only accepts requests with a valid QStash signature. */
 export async function POST(req: Request) {
