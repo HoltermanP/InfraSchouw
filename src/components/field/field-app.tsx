@@ -54,6 +54,14 @@ function Home({ data, sync, go }: { data: Bootstrap; sync: SyncState; go: (r: Fi
   const done = (inspections ?? []).filter((i) => i.status !== "lopend").slice(0, 20);
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 p-4">
+      {sync.lastError && (sync.pending || sync.failed) ? (
+        <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-600/15 p-3 text-sm text-red-100" data-testid="sync-error">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>
+            <span className="font-semibold">Synchroniseren lukt niet.</span> Je opnames staan veilig op dit toestel. Reden: {sync.lastError}
+          </p>
+        </div>
+      ) : null}
       <button
         type="button"
         onClick={() => go({ view: "new", projectId: null, stationId: null })}
