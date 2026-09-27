@@ -48,7 +48,7 @@ De veld-app staat op **/veld** (telefoon/tablet, installeerbaar als PWA) en **/v
 | `pnpm test:e2e` | Playwright tegen `pnpm start` op poort 3200; seedt eerst de demodata. Draai `pnpm build` vooraf |
 | `pnpm build` | Productiebuild |
 | `pnpm db:generate` | Nieuwe migratie uit `src/db/schema.ts` (+ PostGIS-correctie) |
-| `pnpm demo:assets` | Hergenereert de demomedia in `public/demo` |
+| `pnpm demo:assets` | Hergenereert de demomedia in `public/demo` (foto's van Wikimedia Commons, bronvermelding in `public/demo/CREDITS.md`) |
 
 ## Omgevingsvariabelen
 
