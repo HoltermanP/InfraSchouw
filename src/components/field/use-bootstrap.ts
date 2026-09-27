@@ -12,6 +12,7 @@ export type FieldTemplate = {
   phase: string;
   isStation: boolean;
   isBilling: boolean;
+  tracksRoute: boolean;
   checklist: { id: string; question: string; answerType: ChecklistAnswerType; options: string[]; photoRequired: boolean; required: boolean }[];
   shots: { id: string; groupName: string; title: string; description: string; required: boolean; stationComponent: string | null }[];
 };

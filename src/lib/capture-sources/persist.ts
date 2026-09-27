@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { db, type DbOrTx } from "@/db/client";
-import { captures, gpsPoints, inspections, templateShots } from "@/db/schema";
+import { captures, gpsPoints, inspections, inspectionTemplates, templateShots } from "@/db/schema";
 import { ForbiddenError, NotFoundError, orgWhere, scoped, type OrgCtx } from "@/db/scope";
 import { isInNetherlands, wgs84ToRd } from "@/lib/geo/rd";
 import { matchTimestampToTrack, type TrackPoint } from "@/lib/geo/track-matching";
@@ -18,6 +18,12 @@ export function rdFor(lat: number | null | undefined, lon: number | null | undef
   if (!isInNetherlands(lat, lon)) return { rdX: null, rdY: null };
   const { x, y } = wgs84ToRd(lat, lon);
   return { rdX: x, rdY: y };
+}
+
+/** Whether the template is a route (tracé) inspection; others use one inspection location. */
+export async function tracksRoute(templateId: string, conn: DbOrTx = db) {
+  const [tpl] = await conn.select({ tracksRoute: inspectionTemplates.tracksRoute }).from(inspectionTemplates).where(eq(inspectionTemplates.id, templateId)).limit(1);
+  return tpl?.tracksRoute ?? false;
 }
 
 export async function loadTrack(orgId: string, inspectionId: string, conn: DbOrTx = db): Promise<TrackPoint[]> {
@@ -36,14 +42,23 @@ export async function loadTrack(orgId: string, inspectionId: string, conn: DbOrT
  */
 export async function upsertCapture(ctx: OrgCtx, input: CaptureUpsertInput, conn: DbOrTx = db) {
   const s = scoped(ctx, conn);
-  if (input.inspectionId) {
-    const insp = await s.findById(inspections, input.inspectionId);
-    if (!insp) throw new NotFoundError("Schouw niet gevonden.");
-  }
+  const insp = input.inspectionId ? await s.findById(inspections, input.inspectionId) : null;
+  if (input.inspectionId && !insp) throw new NotFoundError("Schouw niet gevonden.");
   if (input.shotId) await s.assertOwned(templateShots, [input.shotId]);
 
-  let { lat, lon, locationSource } = input;
-  if ((lat === null || lon === null) && input.inspectionId) {
+  let { lat, lon, locationSource, accuracy } = input;
+  if (insp && input.locationSource !== "manual" && !(await tracksRoute(insp.templateId, conn))) {
+    // Location inspection: every capture sits on the single inspection location.
+    if (insp.lat !== null && insp.lon !== null) {
+      lat = insp.lat;
+      lon = insp.lon;
+      accuracy = null;
+      locationSource = "inspection";
+    } else if (lat !== null && lon !== null) {
+      // No start location yet: the first located capture fixes it.
+      await conn.update(inspections).set({ lat, lon }).where(orgWhere(inspections, ctx, eq(inspections.id, insp.id)));
+    }
+  } else if ((lat === null || lon === null) && input.inspectionId) {
     const track = await loadTrack(ctx.orgId, input.inspectionId, conn);
     const m = matchTimestampToTrack(track, Date.parse(input.capturedAt));
     if (m) {
@@ -68,7 +83,7 @@ export async function upsertCapture(ctx: OrgCtx, input: CaptureUpsertInput, conn
     durationMs: input.durationMs,
     lat,
     lon,
-    accuracy: input.accuracy,
+    accuracy,
     heading: input.heading,
     ...rd,
     locationSource,

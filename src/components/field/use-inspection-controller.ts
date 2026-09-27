@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getLocalDb, type LocalCapture } from "@/lib/offline/db";
-import { deleteCapture, saveCapture, saveFinding, saveMeasurement, updateCapture, type FieldIdentity } from "@/lib/offline/field-store";
+import { deleteCapture, saveCapture, saveFinding, saveMeasurement, updateCapture, updateLocalInspection, type FieldIdentity } from "@/lib/offline/field-store";
 import type { PhotoResult, VideoResult } from "@/lib/capture-sources/phone-camera";
 import type { CaptureDraft, GeoFix } from "@/lib/capture-sources/types";
 import type { CaptureSourceKind, FindingCategory, Priority } from "@/lib/domain";
@@ -34,7 +34,24 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
   const findings = useMemo(() => findingsQ ?? [], [findingsQ]);
   const measurements = useMemo(() => measurementsQ ?? [], [measurementsQ]);
   const template = data.templates.find((t) => t.id === inspection?.templateId) ?? null;
-  const geo = useGeo({ trackInspectionId: inspection?.status === "lopend" ? inspectionId : null, intervalSeconds: data.org.field.gpsIntervalSeconds });
+  // Only route (tracé) inspections log a GPS track and locate each capture on its own fix.
+  const tracksRoute = template?.tracksRoute ?? false;
+  const geo = useGeo({ trackInspectionId: tracksRoute && inspection?.status === "lopend" ? inspectionId : null, intervalSeconds: data.org.field.gpsIntervalSeconds });
+
+  // Location inspection without a start location: the first GPS fix becomes the inspection location.
+  const placeRequested = useRef(false);
+  const needsPlace = Boolean(inspection && template && !tracksRoute && inspection.status === "lopend" && (inspection.lat === null || inspection.lon === null));
+  useEffect(() => {
+    if (!needsPlace || !geo.fix || placeRequested.current) return;
+    placeRequested.current = true;
+    void updateLocalInspection(inspectionId, { lat: geo.fix.lat, lon: geo.fix.lon });
+  }, [needsPlace, geo.fix, inspectionId]);
+
+  /** Capture location: own GPS fix on a route, otherwise the single inspection location. */
+  const place = (fix: GeoFix | null): ReturnType<typeof locFields> =>
+    !tracksRoute && inspection && inspection.lat !== null && inspection.lon !== null
+      ? { lat: inspection.lat, lon: inspection.lon, accuracy: null, heading: fix?.heading ?? null, locationSource: "inspection" }
+      : locFields(fix);
 
   const photos = useMemo(() => captures.filter((c) => c.type === "photo" || c.type === "sketch"), [captures]);
 
@@ -67,7 +84,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
         blob: photo.blob,
         thumb: photo.thumb,
         mime: photo.mime,
-        ...locFields(meta.fix),
+        ...place(meta.fix),
         shotId: activeShot?.id ?? null,
         tags: meta.tags,
         meta: { width: photo.width, height: photo.height, ...(meta.seriesId ? { seriesId: meta.seriesId } : {}) },
@@ -92,10 +109,10 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
         mime: video.mime,
         durationMs: video.durationMs,
         keyframes: video.keyframes,
-        ...locFields(fix),
+        ...place(fix),
         shotId: activeShot?.id ?? null,
         tags: meta.tags,
-        meta: { track: meta.track },
+        meta: tracksRoute ? { track: meta.track } : {},
       });
       if (video.audio) {
         await saveCapture(identity, inspectionId, {
@@ -106,9 +123,9 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
           blob: video.audio.blob,
           mime: video.audio.mime,
           durationMs: video.durationMs,
-          ...locFields(fix),
+          ...place(fix),
           parentCaptureId: id,
-          meta: { track: meta.track },
+          meta: tracksRoute ? { track: meta.track } : {},
         });
       }
     });
@@ -123,7 +140,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
         blob: clip.blob,
         mime: clip.mime,
         durationMs: clip.durationMs,
-        ...locFields(geo.current()),
+        ...place(geo.current()),
         parentCaptureId,
         meta: { seriesId: clip.seriesId },
       });
@@ -131,7 +148,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
 
   const addNote = (
     (text: string) =>
-      saveCapture(identity, inspectionId, { id: crypto.randomUUID(), type: "note", source, capturedAt: new Date(), ...locFields(geo.current()), textContent: text }));
+      saveCapture(identity, inspectionId, { id: crypto.randomUUID(), type: "note", source, capturedAt: new Date(), ...place(geo.current()), textContent: text }));
 
   const addScan = (
     (text: string, format: string) =>
@@ -140,7 +157,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
         type: "scan",
         source,
         capturedAt: new Date(),
-        ...locFields(geo.current()),
+        ...place(geo.current()),
         textContent: text,
         meta: { scanFormat: format },
       }));
@@ -156,7 +173,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
         blob: rendered,
         thumb: thumb.blob,
         mime: "image/jpeg",
-        ...locFields(geo.current()),
+        ...place(geo.current()),
         parentCaptureId: baseCaptureId,
         meta: { baseCaptureId: baseCaptureId ?? undefined, drawing, width: thumb.width, height: thumb.height },
       });
@@ -164,20 +181,24 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
 
   const addMeasurement = (
     (m: { kind: string; label: string; value: number; unit: string; photoCaptureId: string | null }) => {
-      const fix = geo.current();
-      return saveMeasurement(identity, inspectionId, { ...m, lat: fix?.lat ?? null, lon: fix?.lon ?? null, accuracy: fix?.accuracy ?? null });
+      const loc = place(geo.current());
+      return saveMeasurement(identity, inspectionId, { ...m, lat: loc.lat, lon: loc.lon, accuracy: loc.accuracy });
     });
 
   const addFinding = (
     (f: { title: string; description: string; category: FindingCategory; priority: Priority; captureIds: string[] }) => {
-      const fix = geo.current();
-      const photo = f.captureIds.length ? captures.find((c) => c.id === f.captureIds[0]) : undefined;
-      return saveFinding(inspectionId, { ...f, lat: photo?.lat ?? fix?.lat ?? null, lon: photo?.lon ?? fix?.lon ?? null });
+      const loc = place(geo.current());
+      const photo = tracksRoute && f.captureIds.length ? captures.find((c) => c.id === f.captureIds[0]) : undefined;
+      return saveFinding(inspectionId, { ...f, lat: photo?.lat ?? loc.lat, lon: photo?.lon ?? loc.lon });
     });
 
   const importDrafts = (
     async (drafts: CaptureDraft[]) => {
-      for (const d of drafts) await saveCapture(identity, inspectionId, d);
+      for (const d of drafts) {
+        // Location inspection: imported files also land on the inspection location.
+        const loc = tracksRoute || d.locationSource === "manual" ? null : place(d.lat !== null && d.lon !== null ? { lat: d.lat, lon: d.lon, accuracy: d.accuracy, heading: d.heading, t: 0 } : null);
+        await saveCapture(identity, inspectionId, loc ? { ...d, ...loc } : d);
+      }
     });
 
   // Continuous / push-to-talk audio.
@@ -202,6 +223,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
     identity,
     inspection,
     template,
+    tracksRoute,
     captures,
     photos,
     answers,

@@ -100,13 +100,14 @@ export const CAPTURE_SOURCE_LABELS: Record<CaptureSourceKind, string> = {
   "glasses-browser": "Smart glasses (browser)",
 };
 
-export const LOCATION_SOURCES = ["gps", "exif", "track-match", "manual", "none"] as const;
+export const LOCATION_SOURCES = ["gps", "exif", "track-match", "manual", "inspection", "none"] as const;
 export type LocationSource = (typeof LOCATION_SOURCES)[number];
 export const LOCATION_SOURCE_LABELS: Record<LocationSource, string> = {
   gps: "GPS",
   exif: "EXIF",
   "track-match": "Afgeleid uit GPS-track",
   manual: "Handmatig",
+  inspection: "Schouwlocatie",
   none: "Onbekend",
 };
 

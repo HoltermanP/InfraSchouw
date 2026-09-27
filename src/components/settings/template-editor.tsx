@@ -97,6 +97,7 @@ export function TemplateEditor({ id, initial }: { id: string; initial: TemplateI
             [
               ["isStation", "Stationsschouw (installatiebeschrijving + as-built)"],
               ["isBilling", "Afrekenonderbouwing"],
+              ["tracksRoute", "Tracéschouw (route lopen: GPS-track en locatie per opname; anders één schouwlocatie)"],
               ["active", "Actief (zichtbaar bij schouw starten)"],
             ] as const
           ).map(([key, label]) => (

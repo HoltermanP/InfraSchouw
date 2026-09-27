@@ -44,6 +44,7 @@ export default async function TemplatesPage() {
                 <TableCell className="space-x-1">
                   {t.isStation ? <Badge variant="outline">Station</Badge> : null}
                   {t.isBilling ? <Badge variant="outline">Afrekening</Badge> : null}
+                  {t.tracksRoute ? <Badge variant="outline">Route</Badge> : null}
                 </TableCell>
                 <TableCell>{t.active ? <Badge>Actief</Badge> : <Badge variant="secondary">Inactief</Badge>}</TableCell>
               </TableRow>

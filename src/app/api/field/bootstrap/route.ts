@@ -40,6 +40,7 @@ export const GET = withSession(async (_req, session) => {
         phase: t.phase,
         isStation: t.isStation,
         isBilling: t.isBilling,
+        tracksRoute: t.tracksRoute,
         checklist: t.checklist.map((c) => ({ id: c.id, question: c.question, answerType: c.answerType, options: c.options, photoRequired: c.photoRequired, required: c.required })),
         shots: t.shots.map((s) => ({ id: s.id, groupName: s.groupName, title: s.title, description: s.description, required: s.required, stationComponent: s.stationComponent })),
       })),

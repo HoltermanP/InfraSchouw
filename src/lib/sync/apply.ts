@@ -21,7 +21,7 @@ import { ForbiddenError, NotFoundError, orgWhere, scoped, type OrgCtx } from "@/
 import { audit } from "@/db/queries/audit";
 import { lineLengthMeters } from "@/lib/geo/rd";
 import { trackToLineString } from "@/lib/geo/track-matching";
-import { relocateFromTrack, rdFor, upsertCapture } from "@/lib/capture-sources/persist";
+import { relocateFromTrack, rdFor, tracksRoute, upsertCapture } from "@/lib/capture-sources/persist";
 import { deleteObject, belongsToOrg } from "@/lib/storage";
 import { enqueueCaptureProcessing, enqueueInspectionProcessing } from "@/lib/ai/enqueue";
 import type { SyncOp, SyncOpResult } from "./ops";
@@ -88,8 +88,9 @@ async function applyOne(ctx: OrgCtx, op: SyncOp, tx: Tx, effects: SideEffect[]) 
         startedAt: new Date(p.startedAt),
         weather: p.weather ?? null,
         address: p.address ?? null,
-        lat: p.lat ?? null,
-        lon: p.lon ?? null,
+        // Keep a location fixed later (first located capture) when the client has none.
+        lat: p.lat ?? existing?.lat ?? null,
+        lon: p.lon ?? existing?.lon ?? null,
         deviceInfo: p.deviceInfo ?? null,
         notes: p.notes ?? null,
       };
@@ -215,7 +216,9 @@ async function applyOne(ctx: OrgCtx, op: SyncOp, tx: Tx, effects: SideEffect[]) 
     }
     case "gps.batch": {
       const p = op.payload;
-      await ensureInspection(ctx, p.inspectionId, tx);
+      const insp = await ensureInspection(ctx, p.inspectionId, tx);
+      // Only route (tracé) inspections keep a GPS track.
+      if (!(await tracksRoute(insp.templateId, tx))) return;
       if (p.points.length) {
         for (let i = 0; i < p.points.length; i += 500) {
           await tx

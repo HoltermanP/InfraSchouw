@@ -12,7 +12,18 @@ import { Sheet, PrimaryButton } from "./field-sheets";
 type Item = { draft: CaptureDraft; file: File; warning: string | null; preview: string | null; include: boolean };
 
 /** Bulk import from gallery / glasses storage: EXIF + time matching, preview before confirming. */
-export function ImportSheet({ inspectionId, onImport, onClose }: { inspectionId: string; onImport: (drafts: CaptureDraft[]) => Promise<void>; onClose: () => void }) {
+export function ImportSheet({
+  inspectionId,
+  tracksRoute,
+  onImport,
+  onClose,
+}: {
+  inspectionId: string;
+  /** Tracé: match on the GPS track. Otherwise everything lands on the inspection location. */
+  tracksRoute: boolean;
+  onImport: (drafts: CaptureDraft[]) => Promise<void>;
+  onClose: () => void;
+}) {
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -20,9 +31,9 @@ export function ImportSheet({ inspectionId, onImport, onClose }: { inspectionId:
   async function add(files: FileList | File[] | null) {
     if (!files) return;
     setBusy(true);
-    const points = await getLocalDb().gpsPoints.where("inspectionId").equals(inspectionId).toArray();
+    const points = tracksRoute ? await getLocalDb().gpsPoints.where("inspectionId").equals(inspectionId).toArray() : [];
     const track = points.map((p) => ({ lat: p.lat, lon: p.lon, t: p.t, accuracy: p.accuracy }));
-    const results = await draftsFromFiles(Array.from(files), { track });
+    const results = await draftsFromFiles(Array.from(files), { track, perCaptureLocation: tracksRoute });
     setItems((cur) => [
       ...cur,
       ...results.map((r) => ({
@@ -86,8 +97,8 @@ export function ImportSheet({ inspectionId, onImport, onClose }: { inspectionId:
               <p className="truncate text-sm font-medium">{it.file.name}</p>
               <p className="text-white/60">{fmtDateTime(it.draft.capturedAt)}</p>
               <p className="flex items-center gap-1 text-white/60">
-                <MapPin className="size-3" /> {LOCATION_SOURCE_LABELS[it.draft.locationSource]}
-                {it.draft.lat !== null ? ` · ${it.draft.lat.toFixed(5)}, ${it.draft.lon?.toFixed(5)}` : ""}
+                <MapPin className="size-3" /> {tracksRoute ? LOCATION_SOURCE_LABELS[it.draft.locationSource] : LOCATION_SOURCE_LABELS.inspection}
+                {tracksRoute && it.draft.lat !== null ? ` · ${it.draft.lat.toFixed(5)}, ${it.draft.lon?.toFixed(5)}` : ""}
               </p>
               {it.warning ? (
                 <p className="flex items-center gap-1 text-amber-300">

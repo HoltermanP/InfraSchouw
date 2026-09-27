@@ -25,6 +25,7 @@ export async function ensureStandardTemplates(orgId: string, conn: DbOrTx = db, 
         aiInstructions: t.aiInstructions,
         isStation: t.isStation ?? false,
         isBilling: t.isBilling ?? false,
+        tracksRoute: t.tracksRoute ?? false,
         createdBy,
       })
       .onConflictDoNothing()

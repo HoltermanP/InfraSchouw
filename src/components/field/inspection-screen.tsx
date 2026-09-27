@@ -463,7 +463,7 @@ export function InspectionScreen({ data, inspectionId, go, sync }: { data: Boots
           }}
         />
       ) : null}
-      {overlay?.kind === "import" ? <ImportSheet inspectionId={inspectionId} onImport={ctl.importDrafts} onClose={() => setOverlay(null)} /> : null}
+      {overlay?.kind === "import" ? <ImportSheet inspectionId={inspectionId} tracksRoute={ctl.tracksRoute} onImport={ctl.importDrafts} onClose={() => setOverlay(null)} /> : null}
       {overlay?.kind === "detail"
         ? (() => {
             const c = captures.find((x) => x.id === overlay.captureId);

@@ -29,7 +29,7 @@ function typeFor(file: File): CaptureType | null {
  */
 export async function draftsFromFiles(
   files: File[],
-  opts: { source?: CaptureSourceKind; track?: TrackPoint[]; newId?: () => string } = {},
+  opts: { source?: CaptureSourceKind; track?: TrackPoint[]; newId?: () => string; /** false: the inspection location is used, no warning. */ perCaptureLocation?: boolean } = {},
 ): Promise<{ draft: CaptureDraft; file: File; warning: string | null }[]> {
   const out: { draft: CaptureDraft; file: File; warning: string | null }[] = [];
   for (const file of files) {
@@ -56,7 +56,7 @@ export async function draftsFromFiles(
         locationSource = "track-match";
       }
     }
-    if (lat === null) warning = "Geen locatie gevonden (geen EXIF-GPS en geen passend GPS-track)";
+    if (lat === null && opts.perCaptureLocation !== false) warning = "Geen locatie gevonden (geen EXIF-GPS en geen passend GPS-track)";
     let thumb: Blob | null = null;
     let keyframes: { blob: Blob; offsetMs: number }[] | undefined;
     let durationMs: number | null = null;

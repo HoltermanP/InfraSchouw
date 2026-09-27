@@ -192,6 +192,8 @@ export const inspectionTemplates = pgTable(
     aiInstructions: text("ai_instructions").notNull().default(""),
     isStation: boolean("is_station").notNull().default(false),
     isBilling: boolean("is_billing").notNull().default(false),
+    /** Route-schouw (tracé): GPS-track loggen en opnames langs de route plaatsen. Anders één schouwlocatie. */
+    tracksRoute: boolean("tracks_route").notNull().default(false),
     active: boolean("active").notNull().default(true),
     createdBy: createdBy(),
     ...timestamps,

@@ -23,6 +23,7 @@ export default async function TemplateEditPage(props: PageProps<"/instellingen/t
           aiInstructions: tpl.aiInstructions,
           isStation: tpl.isStation,
           isBilling: tpl.isBilling,
+          tracksRoute: tpl.tracksRoute,
           active: tpl.active,
           checklist: tpl.checklist.map((c) => ({ id: c.id, question: c.question, answerType: c.answerType, options: c.options, photoRequired: c.photoRequired, required: c.required })),
           shots: tpl.shots.map((s) => ({ id: s.id, groupName: s.groupName, title: s.title, description: s.description, required: s.required, stationComponent: s.stationComponent })),

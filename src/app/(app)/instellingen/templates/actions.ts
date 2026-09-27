@@ -75,6 +75,7 @@ export async function duplicateTemplate(id: string) {
           aiInstructions: tpl.aiInstructions,
           isStation: tpl.isStation,
           isBilling: tpl.isBilling,
+          tracksRoute: tpl.tracksRoute,
           active: false,
           createdBy: ctx.userId,
         })

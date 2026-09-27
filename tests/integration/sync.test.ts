@@ -22,7 +22,7 @@ describe.skipIf(!hasDb)("offline sync (server)", () => {
   });
 
   it("past een volledige offline schouw idempotent toe (replay geeft geen duplicaten)", async () => {
-    const tpl = (await getTemplatesFull(a.ctx.schouwer)).find((t) => t.key === "calamiteit")!;
+    const tpl = (await getTemplatesFull(a.ctx.schouwer)).find((t) => t.key === "trace")!;
     const inspectionId = crypto.randomUUID();
     const photoId = crypto.randomUUID();
     const t0 = Date.parse("2026-09-01T10:00:00Z");
@@ -59,6 +59,41 @@ describe.skipIf(!hasDb)("offline sync (server)", () => {
     const [track] = await db.select().from(gpsTracks).where(eq(gpsTracks.inspectionId, inspectionId));
     expect(track!.pointCount).toBe(3);
     expect(track!.lengthM).toBeGreaterThan(200);
+  });
+
+  it("locatieschouw: geen GPS-track, alle opnames op de ene schouwlocatie", async () => {
+    const tpl = (await getTemplatesFull(a.ctx.schouwer)).find((t) => t.key === "calamiteit")!;
+    expect(tpl.tracksRoute).toBe(false);
+    const inspectionId = crypto.randomUUID();
+    const t0 = Date.parse("2026-09-02T10:00:00Z");
+    const photo = (id: string, lat: number | null, lon: number | null): SyncOp => ({
+      id: `p-${id}`,
+      kind: "capture.upsert",
+      payload: {
+        id, inspectionId, type: "photo", blobUrl: `local:orgs/${a.org.id}/inspections/${inspectionId}/${id}.jpg`, thumbUrl: null, mime: "image/jpeg", size: 10, durationMs: null,
+        lat, lon, accuracy: lat === null ? null : 4, heading: 90, locationSource: lat === null ? "none" : "gps", capturedAt: new Date(t0 + 30_000).toISOString(), source: "phone-camera", shotId: null, tags: [], note: null, textContent: null, parentCaptureId: null, meta: {},
+      },
+    });
+    const [p1, p2] = [crypto.randomUUID(), crypto.randomUUID()];
+    const res = await applySyncOps(a.ctx.schouwer, [
+      // No start location: the first located capture fixes it.
+      { id: "1", kind: "inspection.upsert", payload: { id: inspectionId, templateId: tpl.id, projectId: null, stationId: null, title: "Locatieschouw", startedAt: new Date(t0).toISOString(), lat: null, lon: null } },
+      { id: "2", kind: "gps.batch", payload: { inspectionId, points: [0, 1].map((i) => ({ lat: 52.5 + i * 0.001, lon: 6.1, accuracy: 5, t: t0 + i * 60_000 })) } },
+      photo(p1, 52.51, 6.11),
+      photo(p2, 52.6, 6.2),
+    ]);
+    expect(res.every((r) => r.ok)).toBe(true);
+
+    const [insp] = await db.select().from(inspections).where(eq(inspections.id, inspectionId));
+    expect(insp!.lat).toBeCloseTo(52.51, 5);
+    const caps = await db.select().from(captures).where(eq(captures.inspectionId, inspectionId));
+    const second = caps.find((c) => c.id === p2)!;
+    expect(second.locationSource).toBe("inspection");
+    expect(second.lat).toBeCloseTo(52.51, 5);
+    expect(second.lon).toBeCloseTo(6.11, 5);
+    expect(second.heading).toBe(90);
+    const [track] = await db.select().from(gpsTracks).where(eq(gpsTracks.inspectionId, inspectionId));
+    expect(track?.pointCount ?? 0).toBe(0);
   });
 
   it("weigert bestandsverwijzingen en id's van een andere organisatie (permanente fout)", async () => {

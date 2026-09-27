@@ -11,6 +11,7 @@ export const templateInputSchema = z.object({
   aiInstructions: z.string().trim().max(5000),
   isStation: z.boolean(),
   isBilling: z.boolean(),
+  tracksRoute: z.boolean(),
   active: z.boolean(),
   checklist: z
     .array(

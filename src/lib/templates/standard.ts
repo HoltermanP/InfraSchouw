@@ -24,6 +24,8 @@ export type StandardTemplate = {
   aiInstructions: string;
   isStation?: boolean;
   isBilling?: boolean;
+  /** Tracéschouw: route loggen. */
+  tracksRoute?: boolean;
   checklist: StandardChecklistItem[];
   shots: StandardShot[];
   sections: StandardSection[];
@@ -127,6 +129,7 @@ export const STANDARD_TEMPLATES: StandardTemplate[] = [
     key: "trace",
     name: "Tracéschouw",
     phase: "ontwerp",
+    tracksRoute: true,
     description: "Tracé beoordelen: obstakels, bomen, kruisingen, verharding, bereikbaarheid, boorlocaties, vergunningspunten.",
     purposeText:
       "Doel van deze tracéschouw is het beoordelen van het voorgenomen kabeltracé op obstakels, bomen, kruisingen, verharding, bereikbaarheid, mogelijke boorlocaties en vergunningspunten, als input voor het definitief ontwerp.",
@@ -273,6 +276,7 @@ export const STANDARD_TEMPLATES: StandardTemplate[] = [
     key: "oplevering_trace",
     name: "Opleveringsschouw tracé",
     phase: "oplevering",
+    tracksRoute: true,
     description: "Herstel verharding, afwerking, restpunten.",
     purposeText:
       "Deze opleveringsschouw beoordeelt het herstel van verharding en groen langs het tracé, de afwerking en eventuele restpunten voordat het werk wordt opgeleverd.",

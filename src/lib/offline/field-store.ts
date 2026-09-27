@@ -81,7 +81,7 @@ export async function createLocalInspection(
   return local;
 }
 
-export async function updateLocalInspection(id: string, patch: Partial<Pick<LocalInspection, "title" | "notes" | "weather" | "address">>) {
+export async function updateLocalInspection(id: string, patch: Partial<Pick<LocalInspection, "title" | "notes" | "weather" | "address" | "lat" | "lon">>) {
   const db = getLocalDb();
   const current = await db.inspections.get(id);
   if (!current) return;
