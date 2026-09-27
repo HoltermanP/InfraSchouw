@@ -1,16 +1,20 @@
 import type { NextConfig } from "next";
 import { withSerwist } from "@serwist/turbopack";
 
+const FFMPEG_BIN = "./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["sharp", "@react-pdf/renderer", "exceljs", "pg", "ffmpeg-static"],
   // The ffmpeg binary is loaded at runtime (audio chunking / keyframes for imported video).
+  // Point at pnpm's real package directory: including files through the node_modules/ffmpeg-static
+  // symlink makes Vercel reject the function ("files in symlinked directories").
   outputFileTracingIncludes: {
-    "/api/jobs/run": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/sync": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/ingest/glasses": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/import": ["./node_modules/ffmpeg-static/ffmpeg"],
+    "/api/jobs/run": [FFMPEG_BIN],
+    "/api/sync": [FFMPEG_BIN],
+    "/api/ingest/glasses": [FFMPEG_BIN],
+    "/api/import": [FFMPEG_BIN],
   },
   experimental: {
     serverActions: { bodySizeLimit: "25mb" },
