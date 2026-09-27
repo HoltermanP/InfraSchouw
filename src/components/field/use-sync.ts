@@ -18,6 +18,8 @@ export function useSync() {
 
   const pending = useLiveQuery(() => getLocalDb().ops.where("status").anyOf("pending", "processing").count(), [], 0);
   const failed = useLiveQuery(() => getLocalDb().ops.where("status").equals("error").count(), [], 0);
+  // Why the oldest waiting op has not gone through yet (e.g. a failing upload); shown on the sync indicator.
+  const lastError = useLiveQuery(async () => (await getLocalDb().ops.where("status").anyOf("pending", "error").sortBy("seq")).find((o) => o.error)?.error ?? null, [], null);
   const lastSyncAt = useLiveQuery(async () => (await getLocalDb().kv.get("lastSyncAt"))?.value as string | undefined, [], undefined);
 
   const sync = useCallback(async (reason = "manual") => {
@@ -72,5 +74,5 @@ export function useSync() {
     await sync("retry");
   }, [sync]);
 
-  return { running, online, pending: pending ?? 0, failed: failed ?? 0, lastSyncAt, last, sync, retryFailed };
+  return { running, online, pending: pending ?? 0, failed: failed ?? 0, lastError: lastError ?? null, lastSyncAt, last, sync, retryFailed };
 }

@@ -23,7 +23,7 @@ export function SyncIndicator({ sync, compact = false }: { sync: SyncState; comp
     : sync.failed
       ? `${sync.failed} mislukt`
       : sync.pending
-        ? `${sync.pending} wachtend`
+        ? `${sync.pending} wachtend${sync.lastError ? " · probleem" : ""}`
         : "Gesynchroniseerd";
   return (
     <button
@@ -36,7 +36,7 @@ export function SyncIndicator({ sync, compact = false }: { sync: SyncState; comp
       data-testid="sync-indicator"
       data-pending={sync.pending}
       data-online={sync.online}
-      title={sync.lastSyncAt ? `Laatste sync ${fmtDateTime(sync.lastSyncAt)}` : "Nog niet gesynchroniseerd"}
+      title={sync.lastError ?? (sync.lastSyncAt ? `Laatste sync ${fmtDateTime(sync.lastSyncAt)}` : "Nog niet gesynchroniseerd")}
     >
       <Icon className={cn("size-4", sync.running && "animate-spin")} aria-hidden />
       {compact ? sync.pending || "" : label}

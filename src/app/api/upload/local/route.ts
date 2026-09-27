@@ -8,6 +8,8 @@ const MAX_BYTES = 2 * 1024 * 1024 * 1024;
 /** Local-storage upload (used when Vercel Blob is not configured). */
 export const PUT = withSession(async (req, session) => {
   if (storageMode() !== "local") return jsonError(400, "Gebruik de Blob-upload.");
+  // Serverless file systems are read-only: without Vercel Blob uploads cannot be stored at all.
+  if (process.env.VERCEL) return jsonError(503, "Bestandsopslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN ontbreekt).");
   if (session.role === "lezer") return jsonError(403, "Geen rechten om te uploaden.");
   const pathname = new URL(req.url).searchParams.get("pathname") ?? "";
   if (!isSafePathname(pathname) || !pathname.startsWith(orgPrefix(session.org.id))) return jsonError(403, "Ongeldig uploadpad.");

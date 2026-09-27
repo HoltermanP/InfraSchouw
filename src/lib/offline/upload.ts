@@ -54,7 +54,10 @@ export async function uploadFile(
     credentials: "include",
   });
   if (res.status === 401) throw new UnauthorizedError();
-  if (!res.ok) throw new Error(`Upload mislukt (${res.status})`);
+  if (!res.ok) {
+    const detail = ((await res.json().catch(() => null)) as { error?: string } | null)?.error;
+    throw new Error(detail ? `${detail} (${res.status})` : `Upload mislukt (${res.status})`);
+  }
   const data = (await res.json()) as { url: string };
   onProgress?.(100);
   return data.url;
