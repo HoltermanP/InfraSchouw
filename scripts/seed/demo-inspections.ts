@@ -42,15 +42,24 @@ import type { SeedBase } from "./demo";
 
 type LatLon = [number, number];
 
-/** MS-route from station ZWL-STH-4012 to ZWL-STH-4013 (Zwolle-Stadshagen). */
+/**
+ * MS-route from station ZWL-STH-4012 to ZWL-STH-4013 (Zwolle-Stadshagen), following the public
+ * road: grass verge along the Frankhuizerallee (culvert crossing at ~0.30), footway of the
+ * Binnendijkstraat, Twistvlietpad along the Oude Wetering, a directional drilling alongside the
+ * footbridge (~0.66–0.77) and the footway of the Werkerlaan. Traced from OSM/PDOK aerial imagery.
+ */
 export const ROUTE: LatLon[] = [
-  [52.52788, 6.04512],
-  [52.5271, 6.04755],
-  [52.52618, 6.05022],
-  [52.5252, 6.05265],
-  [52.52412, 6.05548],
-  [52.52325, 6.05736],
-  [52.52241, 6.05889],
+  [52.52679, 6.061347], [52.526927, 6.061206], [52.527048, 6.061074], [52.527091, 6.061031],
+  [52.527209, 6.06091], [52.527258, 6.060858], [52.527299, 6.060797], [52.527381, 6.060654],
+  [52.527432, 6.060567], [52.527818, 6.059884], [52.528157, 6.059285], [52.528215, 6.059182],
+  [52.52862, 6.058496], [52.52896, 6.05792], [52.529013, 6.05783], [52.529172, 6.057526],
+  [52.529217, 6.057447], [52.529535, 6.056893], [52.529578, 6.056811], [52.529888, 6.057289],
+  [52.530204, 6.057776], [52.530374, 6.058028], [52.530575, 6.058344], [52.530821, 6.058728],
+  [52.530893, 6.058844], [52.53099, 6.059001], [52.53104, 6.059039], [52.531098, 6.059083],
+  [52.531355, 6.058186], [52.531472, 6.057748], [52.531533, 6.057525], [52.532519, 6.057225],
+  [52.532755, 6.057066], [52.532951, 6.057066], [52.533147, 6.057125], [52.533261, 6.057219],
+  [52.533832, 6.057568], [52.53442, 6.057823], [52.534566, 6.05793], [52.534526, 6.058064],
+  [52.534449, 6.058166],
 ];
 
 function interpolate(route: LatLon[], f: number): LatLon {
@@ -119,10 +128,17 @@ type CaptureSpec = {
 
 async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, template: TemplateFull, specs: CaptureSpec[]) {
   const ids: string[] = [];
-  let seq = 0;
-  for (const s of specs) {
+  const isNumbered = (s: CaptureSpec) => (s.type ?? "photo") === "photo" || s.type === "video";
+  // Photo/video numbers follow capture time, not the order of the specs.
+  const seqOf = new Map(
+    specs
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => isNumbered(s))
+      .sort((a, b) => a.s.at - b.s.at)
+      .map(({ i }, n) => [i, n + 1]),
+  );
+  for (const [i, s] of specs.entries()) {
     const type = s.type ?? "photo";
-    const numbered = type === "photo" || type === "video";
     const { x, y } = wgs84ToRd(s.pos[0], s.pos[1]);
     const shot = s.shot ? template.shots.find((sh) => sh.title.startsWith(s.shot!)) : undefined;
     const [row] = await db
@@ -150,7 +166,7 @@ async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, te
         note: s.note ?? null,
         textContent: s.text ?? null,
         parentCaptureId: s.parent ?? null,
-        seq: numbered ? ++seq : null,
+        seq: seqOf.get(i) ?? null,
         meta: (s.meta ?? {}) as never,
         createdBy: ctx.userId,
       })
@@ -332,7 +348,7 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
         startedAt: start,
         endedAt: new Date(start.getTime() + 95 * 60_000),
         weather: { temperatureC: 17.4, precipitationMm: 0, windSpeedKmh: 14, windDirectionDeg: 240, humidity: 72, weatherCode: 2, description: "Half bewolkt", observedAt: start.toISOString(), source: "open-meteo" },
-        address: "Frankhuizerallee 120, 8043 AL Zwolle",
+        address: "Frankhuizerallee 120, 8043 XB Zwolle",
         lat: ROUTE[0]![0],
         lon: ROUTE[0]![1],
         deviceInfo: { userAgent: "Demo iPhone 16 (Safari)", platform: "iOS", screen: "393x852" },
@@ -343,27 +359,28 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
     await insertTrack(schouwer, insp!.id, trackPoints(ROUTE, start, 90, 7));
     const at = (f: number) => interpolate(ROUTE, f);
     const caps = await insertCaptures(schouwer, insp!.id, start, t, [
-      { key: "trace-01-start", at: 3, pos: at(0.02), heading: 110, shot: "Beginpunt", analysis: analysis("Beginpunt van het tracé bij station ZWL-STH-4012 aan de Frankhuizerallee.", "Straatbeeld met fietspad, fietsenstalling en nieuwbouwwoningen. Het tracé start in de berm langs het fietspad naast het nieuwe compacte station. Geen obstakels zichtbaar in de eerste 20 m.", ["tracé", "berm", "klinkers"]) },
-      { key: "trace-02-bomen", at: 11, pos: at(0.14), heading: 95, shot: "Bomen", tags: ["boom"], analysis: analysis("Bomenrij direct langs het beoogde tracé in de berm.", "Twee volgroeide straatbomen (vermoedelijk linde) op circa 1 m van de indicatieve tracélijn. De kroonprojectie reikt over het tracé; wortelschade bij open ontgraving is waarschijnlijk.", ["boom", "kroonprojectie", "berm"], { possible_findings: [{ category: "omgeving", description: "Tracé binnen kroonprojectie van twee bomen", priority: "hoog", confidence: 0.8 }] }) },
-      { key: "trace-03-kruising", at: 22, pos: at(0.3), heading: 180, shot: "Kruising", tags: ["kruising"], analysis: analysis("Kruising Frankhuizerallee / Werkerlaan met voetgangersoversteek.", "Viersprong met asfaltverharding en een voetgangersoversteek. Voor het kruisen van de rijbaan is een verkeersmaatregel of gestuurde boring nodig.", ["kruising", "asfalt", "verkeer"]) },
-      { key: "trace-04-klinkers", at: 30, pos: at(0.4), heading: 90, tags: ["verharding"], analysis: analysis("Klinkerverharding van het trottoir langs het tracé.", "Gemêleerde gebakken klinkers in keperverband, in goede staat. Lokaal lichte spoorvorming. Herstel na ontgraving in hetzelfde verband.", ["klinkers", "verharding"]) },
-      { key: "trace-05-boorlocatie", at: 41, pos: at(0.52), heading: 45, shot: "Mogelijke boorlocatie", tags: ["boorlocatie"], analysis: analysis("Beoogde intredelocatie voor de gestuurde boring onder de watergang.", "Compacte boorstelling opgesteld op het trottoir bij het intredepunt, werkvak gemarkeerd met bebakening. Voldoende ruimte en bereikbaar vanaf de rijbaan.", ["boring", "boorlocatie", "grasveld"]) },
-      { key: "trace-06-sloot", at: 45, pos: at(0.56), heading: 40, tags: ["watergang"], analysis: analysis("Watergang die met een gestuurde boring gekruist moet worden.", "Watergang van circa 8 m breed met natuurlijke oevers. Kruising vereist een watervergunning van het waterschap en een boring met voldoende dekking onder de waterbodem.", ["watergang", "boring", "vergunning"], { possible_findings: [{ category: "vergunning", description: "Watervergunning waterschap nodig voor kruising watergang", priority: "midden", confidence: 0.85 }] }) },
-      { key: "trace-07-sleuf", at: 58, pos: at(0.7), heading: 120, tags: ["sleuf", "proefsleuf"], analysis: analysis("Proefsleuf met drie bestaande kabels.", "Proefsleuf van circa 1 m diep. Zichtbaar: gele MS-mantelbuis, bundel gekleurde telecombuizen en een LS-kabel (links onder). Diepte-indicatie (ca. 70 cm tot bovenkant MS-kabel).", ["sleuf", "kabels", "diepte"], { possible_findings: [{ category: "techniek", description: "Bestaande kabels liggen in het beoogde tracé; ligging nieuw tracé aanpassen", priority: "midden", confidence: 0.7 }] }) },
-      { key: "trace-08-berm", at: 66, pos: at(0.8), heading: 100, tags: ["berm"], analysis: analysis("Grasberm tussen rijbaan en trottoir.", "Brede grasberm zonder zichtbare obstakels; geschikt voor open ontgraving.", ["berm", "gras"]) },
-      { key: "trace-09-oprit", at: 74, pos: at(0.88), heading: 70, tags: ["bereikbaarheid"], analysis: analysis("Inritten van woningen langs het tracé.", "Drie inritten naar woningen. Tijdens uitvoering moet de bereikbaarheid voor bewoners gegarandeerd blijven (rijplaten of gefaseerde uitvoering).", ["inrit", "bereikbaarheid", "BLVC"], { privacy_flags: { persons_recognizable: false, license_plates_visible: true, notes: "Geparkeerde auto met leesbaar kenteken op de achtergrond" } }) },
-      { key: "trace-10-eind", at: 86, pos: at(0.99), heading: 60, shot: "Eindpunt", analysis: analysis("Eindpunt van het tracé bij station ZWL-STH-4013 aan de Werkerlaan.", "Stationslocatie in de groenstrook naast de Werkerlaan, bij een bestaande kabelkast. Kabelinvoerzijde vrij bereikbaar.", ["station", "eindpunt"]) },
-      { type: "video", blobUrl: "static:/demo/video-trace.mp4", thumbUrl: "static:/demo/thumbs/trace-06-sloot.jpg", mime: "video/mp4", durationMs: 8000, at: 46, pos: at(0.57), heading: 50, meta: { keyframes: [{ url: "static:/demo/trace-05-boorlocatie.jpg", offsetMs: 0 }, { url: "static:/demo/trace-06-sloot.jpg", offsetMs: 4000 }] }, analysis: analysis("Video van boorlocatie en watergang.", "Panorama van de intredelocatie naar de watergang; toont de ruimte voor de boorstelling en de oevers.", ["video", "boring", "watergang"]) },
-      { type: "audio", blobUrl: "static:/demo/spraak-trace.wav", mime: "audio/wav", durationMs: 90_000, at: 10, pos: at(0.13) },
-      { type: "note", at: 35, pos: at(0.45), text: "Aannemer geeft aan dat de klinkers in dit deel in 2019 zijn vernieuwd; herstel in dezelfde kleur en hetzelfde verband." },
-      { type: "note", at: 60, pos: at(0.72), text: "KLIC-melding 26O0123456 komt overeen met de situatie in de proefsleuf, behalve de telecomkabel: die ligt circa 40 cm oostelijker." },
-      { type: "measurement", at: 59, pos: at(0.71), text: "Diepte bovenkant bestaande MS-kabel: 72 cm" },
-      { type: "measurement", at: 47, pos: at(0.58), text: "Breedte watergang: 8,2 m" },
+      { key: "trace-01-start", at: 2, pos: at(0.02), heading: 110, shot: "Beginpunt", analysis: analysis("Beginpunt van het tracé bij station ZWL-STH-4012 aan de Frankhuizerallee.", "Straatbeeld met fietspad, fietsenstalling en nieuwbouwwoningen. Het tracé start in de berm langs het fietspad naast het nieuwe compacte station. Geen obstakels zichtbaar in de eerste 20 m.", ["tracé", "berm", "klinkers"]) },
+      { key: "trace-02-bomen", at: 11, pos: at(0.12), heading: 95, shot: "Bomen", tags: ["boom"], analysis: analysis("Bomenrij direct langs het beoogde tracé in de berm.", "Twee volgroeide straatbomen (vermoedelijk linde) op circa 1 m van de indicatieve tracélijn. De kroonprojectie reikt over het tracé; wortelschade bij open ontgraving is waarschijnlijk.", ["boom", "kroonprojectie", "berm"], { possible_findings: [{ category: "omgeving", description: "Tracé binnen kroonprojectie van twee bomen", priority: "hoog", confidence: 0.8 }] }) },
+      { key: "trace-03-kruising", at: 34, pos: at(0.375), heading: 45, shot: "Kruising", tags: ["kruising"], analysis: analysis("Kruising Frankhuizerallee / Binnendijkstraat met voetgangersoversteek.", "Viersprong met asfaltverharding en een voetgangersoversteek. Voor het kruisen van de rijbaan is een verkeersmaatregel of gestuurde boring nodig.", ["kruising", "asfalt", "verkeer"]) },
+      { key: "trace-04-klinkers", at: 41, pos: at(0.45), heading: 35, tags: ["verharding"], analysis: analysis("Klinkerverharding van het trottoir langs het tracé.", "Gemêleerde gebakken klinkers in keperverband, in goede staat. Lokaal lichte spoorvorming. Herstel na ontgraving in hetzelfde verband.", ["klinkers", "verharding"]) },
+      { key: "trace-05-boorlocatie", at: 25, pos: at(0.27), heading: 20, shot: "Mogelijke boorlocatie", tags: ["boorlocatie"], analysis: analysis("Beoogde intredelocatie voor de gestuurde boring onder de watergang.", "Compacte boorstelling opgesteld op het trottoir bij het intredepunt, werkvak gemarkeerd met bebakening. Voldoende ruimte en bereikbaar vanaf de rijbaan.", ["boring", "boorlocatie", "grasveld"]) },
+      { key: "trace-06-sloot", at: 28, pos: at(0.3), heading: 30, tags: ["watergang"], analysis: analysis("Watergang die met een gestuurde boring gekruist moet worden.", "Watergang van circa 8 m breed met natuurlijke oevers. Kruising vereist een watervergunning van het waterschap en een boring met voldoende dekking onder de waterbodem.", ["watergang", "boring", "vergunning"], { possible_findings: [{ category: "vergunning", description: "Watervergunning waterschap nodig voor kruising watergang", priority: "midden", confidence: 0.85 }] }) },
+      { key: "trace-07-sleuf", at: 54, pos: at(0.6), heading: 120, tags: ["sleuf", "proefsleuf"], analysis: analysis("Proefsleuf met drie bestaande kabels.", "Proefsleuf van circa 1 m diep. Zichtbaar: gele MS-mantelbuis, bundel gekleurde telecombuizen en een LS-kabel (links onder). Diepte-indicatie (ca. 70 cm tot bovenkant MS-kabel).", ["sleuf", "kabels", "diepte"], { possible_findings: [{ category: "techniek", description: "Bestaande kabels liggen in het beoogde tracé; ligging nieuw tracé aanpassen", priority: "midden", confidence: 0.7 }] }) },
+      { key: "trace-08-berm", at: 18, pos: at(0.2), heading: 300, tags: ["berm"], analysis: analysis("Grasberm tussen rijbaan en trottoir.", "Brede grasberm zonder zichtbare obstakels; geschikt voor open ontgraving.", ["berm", "gras"]) },
+      { key: "trace-09-oprit", at: 46, pos: at(0.51), heading: 125, tags: ["bereikbaarheid"], analysis: analysis("Inritten van woningen aan de Binnendijkstraat.", "Drie inritten naar woningen. Tijdens uitvoering moet de bereikbaarheid voor bewoners gegarandeerd blijven (rijplaten of gefaseerde uitvoering).", ["inrit", "bereikbaarheid", "BLVC"], { privacy_flags: { persons_recognizable: false, license_plates_visible: true, notes: "Geparkeerde auto met leesbaar kenteken op de achtergrond" } }) },
+      { key: "trace-10-eind", at: 88, pos: at(0.99), heading: 110, shot: "Eindpunt", analysis: analysis("Eindpunt van het tracé bij station ZWL-STH-4013 aan de Werkerlaan.", "Stationslocatie in de groenstrook naast de Werkerlaan, bij een bestaande kabelkast. Kabelinvoerzijde vrij bereikbaar.", ["station", "eindpunt"]) },
+      { type: "video", blobUrl: "static:/demo/video-trace.mp4", thumbUrl: "static:/demo/thumbs/trace-06-sloot.jpg", mime: "video/mp4", durationMs: 8000, at: 27, pos: at(0.295), heading: 30, meta: { keyframes: [{ url: "static:/demo/trace-05-boorlocatie.jpg", offsetMs: 0 }, { url: "static:/demo/trace-06-sloot.jpg", offsetMs: 4000 }] }, analysis: analysis("Video van boorlocatie en watergang.", "Panorama van de intredelocatie naar de watergang; toont de ruimte voor de boorstelling en de oevers.", ["video", "boring", "watergang"]) },
+      { type: "audio", blobUrl: "static:/demo/spraak-trace.wav", mime: "audio/wav", durationMs: 90_000, at: 10, pos: at(0.11) },
+      { type: "note", at: 42, pos: at(0.47), text: "Aannemer geeft aan dat de klinkers in dit deel in 2019 zijn vernieuwd; herstel in dezelfde kleur en hetzelfde verband." },
+      { type: "note", at: 55, pos: at(0.61), text: "KLIC-melding 26O0123456 komt overeen met de situatie in de proefsleuf, behalve de telecomkabel: die ligt circa 40 cm oostelijker." },
+      { type: "measurement", at: 54, pos: at(0.605), text: "Diepte bovenkant bestaande MS-kabel: 72 cm" },
+      { type: "measurement", at: 28, pos: at(0.3), text: "Breedte watergang: 8,2 m" },
+      { type: "note", at: 66, pos: at(0.7), text: "Oude Wetering: kruising met een gestuurde boring van ca. 110 m, oostelijk naast de voetbrug (≥ 5 m uit de brugfundering). Intree op het Twistvlietpad, uittree op de kade aan de noordzijde." },
     ]);
     // measurements rows (captures 14/15 are measurement captures; photo 7 = sleuf).
     await db.insert(measurements).values([
-      { orgId: org.id, inspectionId: insp!.id, captureId: caps[14]!, photoCaptureId: caps[6]!, kind: "diepte", label: "Diepte bovenkant bestaande MS-kabel", value: 72, unit: "cm", lat: at(0.71)[0], lon: at(0.71)[1], measuredAt: new Date(start.getTime() + 59 * 60_000), createdBy: users.schouwer.id },
-      { orgId: org.id, inspectionId: insp!.id, captureId: caps[15]!, photoCaptureId: caps[5]!, kind: "breedte", label: "Breedte watergang", value: 8.2, unit: "m", lat: at(0.58)[0], lon: at(0.58)[1], measuredAt: new Date(start.getTime() + 47 * 60_000), createdBy: users.schouwer.id },
+      { orgId: org.id, inspectionId: insp!.id, captureId: caps[14]!, photoCaptureId: caps[6]!, kind: "diepte", label: "Diepte bovenkant bestaande MS-kabel", value: 72, unit: "cm", lat: at(0.605)[0], lon: at(0.605)[1], measuredAt: new Date(start.getTime() + 54 * 60_000), createdBy: users.schouwer.id },
+      { orgId: org.id, inspectionId: insp!.id, captureId: caps[15]!, photoCaptureId: caps[5]!, kind: "breedte", label: "Breedte watergang", value: 8.2, unit: "m", lat: at(0.3)[0], lon: at(0.3)[1], measuredAt: new Date(start.getTime() + 28 * 60_000), createdBy: users.schouwer.id },
     ]);
     await insertTranscript(schouwer, insp!.id, caps[11]!, new Date(start.getTime() + 10 * 60_000), [
       { from: 0, to: 12, text: "Oké, we staan nu bij de bomenrij aan de Frankhuizerallee. De twee lindes staan maximaal een meter van het tracé." },
@@ -375,16 +392,16 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
       { title: "Tracé binnen kroonprojectie van twee straatbomen", description: "Het tracé ligt op circa 1 m van twee volgroeide lindes; de kroonprojectie reikt over het tracé. Bij open ontgraving is wortelschade te verwachten.", category: "omgeving", priority: "hoog", captureIdx: [1], recommendation: "Tracé ter plaatse 2 m richting rijbaan verleggen of handmatig ontgraven onder begeleiding van een boomdeskundige; bomeneffectanalyse (BEA) laten uitvoeren." },
       { title: "Watervergunning nodig voor kruising watergang", description: "De watergang (8,2 m breed) moet met een gestuurde boring worden gekruist. Hiervoor is een watervergunning van het waterschap vereist.", category: "vergunning", priority: "midden", captureIdx: [4, 5, 10], recommendation: "Watervergunning aanvragen bij Waterschap Drents Overijsselse Delta; boorplan met dekking ≥ 2 m onder waterbodem opstellen." },
       { title: "Bestaande kabels in beoogd tracé", description: "In de proefsleuf zijn LS-, MS- en telecomkabels aangetroffen op circa 72 cm diepte. De telecomkabel ligt circa 40 cm oostelijker dan in de KLIC-melding.", category: "techniek", priority: "midden", captureIdx: [6], recommendation: "Tracé tussen hectometer 0,7 en 0,8 verschuiven naar de berm en extra proefsleuven graven; afwijking KLIC terugmelden bij KPN." },
-      { title: "Bereikbaarheid inritten tijdens uitvoering", description: "Drie woninginritten liggen op het tracé.", category: "planning", priority: "laag", captureIdx: [8], recommendation: "Gefaseerd uitvoeren en rijplaten gebruiken; bewoners vooraf informeren (BLVC-plan)." },
-      { title: "Kruising Werkerlaan vraagt verkeersmaatregel", description: "Het tracé kruist de Werkerlaan ter hoogte van de voetgangersoversteek.", category: "veiligheid", priority: "midden", captureIdx: [2], recommendation: "Kruising uitvoeren met een korte gestuurde boring of halve-rijbaanafzetting conform CROW 96b; verkeersplan laten goedkeuren door de gemeente." },
+      { title: "Bereikbaarheid inritten tijdens uitvoering", description: "Drie woninginritten aan de Binnendijkstraat liggen op het tracé.", category: "planning", priority: "laag", captureIdx: [8], recommendation: "Gefaseerd uitvoeren en rijplaten gebruiken; bewoners vooraf informeren (BLVC-plan)." },
+      { title: "Kruising Binnendijkstraat vraagt verkeersmaatregel", description: "Het tracé kruist de Binnendijkstraat ter hoogte van de voetgangersoversteek.", category: "veiligheid", priority: "midden", captureIdx: [2], recommendation: "Kruising uitvoeren met een korte gestuurde boring of halve-rijbaanafzetting conform CROW 96b; verkeersplan laten goedkeuren door de gemeente." },
     ]);
     await db.insert(actions).values([
       { orgId: org.id, inspectionId: insp!.id, projectId: project.id, description: "Tracé ter plaatse van de bomen 2 m richting rijbaan verschuiven en BEA aanvragen", owner: "Ontwerper Demo Infra", dueDate: "2026-09-22", status: "in_uitvoering", findingIds: [fIds[0]!], source: "transcript", createdBy: users.schouwer.id },
       { orgId: org.id, inspectionId: insp!.id, projectId: project.id, description: "Watervergunning aanvragen voor kruising watergang", owner: "Projectleider", dueDate: "2026-10-01", status: "open", findingIds: [fIds[1]!], source: "handmatig", createdBy: users.projectleider.id },
       { orgId: org.id, inspectionId: insp!.id, projectId: project.id, description: "Afwijking telecomkabel terugmelden (KLIC-terugmelding)", owner: "Aannemer", dueDate: "2026-09-15", status: "gereed", findingIds: [fIds[2]!], source: "handmatig", createdBy: users.schouwer.id },
-      { orgId: org.id, inspectionId: insp!.id, projectId: project.id, description: "Verkeersplan kruising Werkerlaan ter goedkeuring indienen bij gemeente Zwolle", owner: "Aannemer", dueDate: "2026-10-06", status: "open", findingIds: [fIds[4]!], source: "ai", createdBy: users.schouwer.id },
+      { orgId: org.id, inspectionId: insp!.id, projectId: project.id, description: "Verkeersplan kruising Binnendijkstraat ter goedkeuring indienen bij gemeente Zwolle", owner: "Aannemer", dueDate: "2026-10-06", status: "open", findingIds: [fIds[4]!], source: "ai", createdBy: users.schouwer.id },
     ]);
-    await answerAll(schouwer, insp!.id, t, { 1: { value: 2, note: "Werkerlaan en watergang" }, 2: { value: "ja", caps: [caps[1]!] }, 3: { value: "ja", note: "Grasveld bij watergang" }, 4: { value: "Klinkers" }, 5: { value: "ja" }, 6: { value: "ja", note: "Waterschap en gemeente" }, 7: { value: "ja", note: "Afwijking telecomkabel geconstateerd" }, 8: { value: "Bomen en watergang zijn de belangrijkste knelpunten." } }, new Date(start.getTime() + 88 * 60_000));
+    await answerAll(schouwer, insp!.id, t, { 1: { value: 2, note: "Binnendijkstraat, watergang Frankhuizerallee en Oude Wetering" }, 2: { value: "ja", caps: [caps[1]!] }, 3: { value: "ja", note: "Grasveld bij watergang" }, 4: { value: "Klinkers" }, 5: { value: "ja" }, 6: { value: "ja", note: "Waterschap en gemeente" }, 7: { value: "ja", note: "Afwijking telecomkabel geconstateerd" }, 8: { value: "Bomen en watergang zijn de belangrijkste knelpunten." } }, new Date(start.getTime() + 88 * 60_000));
     await db.insert(inspectionParticipants).values([
       { orgId: org.id, inspectionId: insp!.id, name: "Sanne Bakker", organization: "Demo Infra BV", role: "Toezichthouder", signatureUrl: "static:/demo/signature-1.png", signedAt: new Date(start.getTime() + 94 * 60_000), createdBy: users.schouwer.id },
       { orgId: org.id, inspectionId: insp!.id, name: "Mark de Boer", organization: "Grondwerk Oost BV", role: "Uitvoerder aannemer", signatureUrl: "static:/demo/signature-2.png", signedAt: new Date(start.getTime() + 94 * 60_000), createdBy: users.schouwer.id },
@@ -400,10 +417,10 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
           { title: "Bomen binnen kroonprojectie", description: "Tracé 2 m verleggen of handmatig graven; BEA aanvragen.", priority: "hoog", category: "omgeving", finding_ids: ["0"], capture_ids: [c[1]!] },
           { title: "Watervergunning watergang", description: "Gestuurde boring onder watergang; vergunning waterschap nodig.", priority: "midden", category: "vergunning", finding_ids: ["1"], capture_ids: [c[5]!] },
           { title: "Kabels in tracé / afwijking KLIC", description: "Telecomkabel 40 cm oostelijker dan KLIC; extra proefsleuven.", priority: "midden", category: "techniek", finding_ids: ["2"], capture_ids: [c[6]!] },
-          { title: "Verkeersmaatregel kruising Werkerlaan", description: "Verkeersplan laten goedkeuren.", priority: "midden", category: "veiligheid", finding_ids: ["4"], capture_ids: [c[2]!] },
+          { title: "Verkeersmaatregel kruising Binnendijkstraat", description: "Verkeersplan laten goedkeuren.", priority: "midden", category: "veiligheid", finding_ids: ["4"], capture_ids: [c[2]!] },
         ],
         sections: [
-          { key: "doel_scope", title: "Doel en scope", blocks: [{ type: "paragraph", text: t.purposeText }, { type: "paragraph", text: "Scope: het volledige tracé van station ZWL-STH-4012 tot ZWL-STH-4013 (circa 1,2 km), inclusief de kruisingen met de Werkerlaan en de watergang. De schouw is samen met de uitvoerder van de aannemer gelopen." }] },
+          { key: "doel_scope", title: "Doel en scope", blocks: [{ type: "paragraph", text: t.purposeText }, { type: "paragraph", text: "Scope: het volledige tracé van station ZWL-STH-4012 tot ZWL-STH-4013 (circa 1,2 km), inclusief de kruisingen met de Binnendijkstraat, de watergang langs de Frankhuizerallee en de Oude Wetering. De schouw is samen met de uitvoerder van de aannemer gelopen." }] },
           { key: "overzichtskaart", title: "Overzichtskaart", blocks: [{ type: "paragraph", text: "De kaart toont de gelopen route (GPS-track), de genummerde fotolocaties en de bevindingen." }, { type: "map", bbox: null }] },
           {
             key: "bevindingen",
@@ -414,7 +431,7 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
               { type: "finding_ref", finding_index: 0 },
               { type: "photo", capture_id: c[1]!, caption: "Bomenrij met kroonprojectie over het tracé" },
               { type: "finding_ref", finding_index: 4 },
-              { type: "photo", capture_id: c[2]!, caption: "Kruising met de Werkerlaan" },
+              { type: "photo", capture_id: c[2]!, caption: "Kruising met de Binnendijkstraat" },
               { type: "paragraph", text: "Het trottoir bestaat uit rode betonklinkers in keperverband in goede staat; herstel moet in hetzelfde verband en dezelfde kleur." },
               { type: "photo", capture_id: c[3]!, caption: "Klinkerverharding trottoir" },
               { type: "finding_ref", finding_index: 1 },
@@ -614,7 +631,7 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
   {
     const t = tpl("nulmeting");
     const start = new Date("2026-08-25T06:15:00Z");
-    const seg: LatLon[] = [interpolate(ROUTE, 0.3), interpolate(ROUTE, 0.45)];
+    const seg: LatLon[] = [interpolate(ROUTE, 0.08), interpolate(ROUTE, 0.24)];
     const [insp] = await db
       .insert(inspections)
       .values({
@@ -627,7 +644,7 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
         startedAt: start,
         endedAt: new Date(start.getTime() + 40 * 60_000),
         weather: { temperatureC: 14.2, precipitationMm: 0, windSpeedKmh: 6, windDirectionDeg: 90, humidity: 88, weatherCode: 1, description: "Overwegend helder", observedAt: start.toISOString(), source: "open-meteo" },
-        address: "Frankhuizerallee 110, 8043 AL Zwolle",
+        address: "Frankhuizerallee 110, 8043 XB Zwolle",
         lat: seg[0]![0],
         lon: seg[0]![1],
         createdBy: users.schouwer.id,
