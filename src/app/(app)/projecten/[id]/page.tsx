@@ -23,7 +23,7 @@ export default async function ProjectOverviewPage(props: PageProps<"/projecten/[
   const org = session.ctx.orgId;
   const [insp, sts, fnd, nOpenActions, nBilling, klic] = await Promise.all([
     db
-      .select({ i: inspections, t: inspectionTemplates.name })
+      .select({ i: inspections, t: inspectionTemplates.name, tracksRoute: inspectionTemplates.tracksRoute })
       .from(inspections)
       .innerJoin(inspectionTemplates, eq(inspectionTemplates.id, inspections.templateId))
       .where(and(eq(inspections.orgId, org), eq(inspections.projectId, id)))
@@ -60,7 +60,8 @@ export default async function ProjectOverviewPage(props: PageProps<"/projecten/[
         klic={klic}
         inspections={insp.filter((r) => r.i.lat !== null).map((r) => ({ id: r.i.id, lat: r.i.lat!, lon: r.i.lon!, label: `${r.t}: ${r.i.title}`, kind: "inspection" as const }))}
         stations={sts.filter((s) => s.lat !== null).map((s) => ({ id: s.id, lat: s.lat!, lon: s.lon!, label: `${s.code} – ${s.name}`, kind: "station" as const }))}
-        findings={fnd.filter((f) => f.lat !== null).map((f) => ({ id: f.id, lat: f.lat!, lon: f.lon!, priority: f.priority, title: f.title, inspectionId: f.inspectionId }))}
+        // Location inspections appear as their single point; only route inspections show findings along the route.
+        findings={fnd.filter((f) => f.lat !== null && insp.some((r) => r.i.id === f.inspectionId && r.tracksRoute)).map((f) => ({ id: f.id, lat: f.lat!, lon: f.lon!, priority: f.priority, title: f.title, inspectionId: f.inspectionId }))}
       />
       {project.description ? <p className="max-w-3xl text-sm">{project.description}</p> : null}
       <section>

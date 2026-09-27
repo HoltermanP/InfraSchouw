@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { roleAtLeast } from "@/lib/domain";
 import { loadInspectionContext } from "@/lib/report/context";
 import { captureDtos } from "@/lib/report/dto";
+import { inspectionSite } from "@/lib/geo/site";
 
 export const metadata = { title: "Schouw — kaart" };
 
@@ -35,6 +36,8 @@ export default async function InspectionMapPage(props: PageProps<"/schouwen/[id]
       area={ctx.project?.areaGeojson ?? null}
       klic={klic}
       canEdit={roleAtLeast(session.role, "schouwer")}
+      tracksRoute={ctx.template.tracksRoute}
+      site={inspectionSite(ctx.inspection, ctx.captures)}
     />
   );
 }

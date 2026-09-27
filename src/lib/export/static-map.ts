@@ -2,6 +2,8 @@ import "server-only";
 import sharp, { type OverlayOptions } from "sharp";
 import { PDOK_TILES, latToTileY, lonToTileX } from "@/lib/geo/pdok";
 import { PRIORITY_COLORS, type Priority } from "@/lib/domain";
+import { inspectionSite } from "@/lib/geo/site";
+import type { InspectionContext } from "@/lib/report/context";
 
 export type StaticMapInput = {
   width?: number;
@@ -11,6 +13,8 @@ export type StaticMapInput = {
   track?: GeoJSON.LineString | null;
   area?: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
   extraPoints?: { lat: number; lon: number }[];
+  /** Location inspection: one pin on the inspection location instead of photo/finding markers. */
+  site?: { lat: number; lon: number } | null;
   basemap?: "brt" | "luchtfoto";
   fetchImpl?: typeof fetch;
 };
@@ -29,7 +33,7 @@ function worldPx(lat: number, lon: number, z: number) {
 export async function renderStaticMap(input: StaticMapInput): Promise<Buffer | null> {
   const width = input.width ?? 1600;
   const height = input.height ?? 1000;
-  const pts: { lat: number; lon: number }[] = [...input.photos, ...input.findings, ...(input.extraPoints ?? [])];
+  const pts: { lat: number; lon: number }[] = [...input.photos, ...input.findings, ...(input.extraPoints ?? []), ...(input.site ? [input.site] : [])];
   input.track?.coordinates.forEach(([lon, lat]) => pts.push({ lat: lat!, lon: lon! }));
   if (input.area) {
     const polys = input.area.type === "Polygon" ? [input.area.coordinates] : input.area.coordinates;
@@ -132,6 +136,12 @@ export async function renderStaticMap(input: StaticMapInput): Promise<Buffer | n
       `<g transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><circle r="15" fill="#0f4c81" stroke="#fff" stroke-width="3"/><text y="5.5" text-anchor="middle" font-family="Helvetica, Arial" font-size="${ph.nr && ph.nr > 99 ? 11 : 14}" font-weight="700" fill="#fff">${ph.nr ?? ""}</text></g>`,
     );
   }
+  if (input.site) {
+    const p = project(input.site.lat, input.site.lon);
+    svgParts.push(
+      `<g transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><path d="M0 0 C-6 -12 -20 -20 -20 -34 A20 20 0 1 1 20 -34 C20 -20 6 -12 0 0Z" fill="#0f4c81" stroke="#fff" stroke-width="4"/><circle cy="-34" r="7" fill="#fff"/></g>`,
+    );
+  }
   // Scale bar (metres per pixel at the centre latitude).
   const centerLat = (minLat + maxLat) / 2;
   const mpp = (156543.03392 * Math.cos((centerLat * Math.PI) / 180)) / 2 ** z;
@@ -150,4 +160,21 @@ export async function renderStaticMap(input: StaticMapInput): Promise<Buffer | n
     .composite([...tiles, { input: svg, left: 0, top: 0 }])
     .png({ compressionLevel: 8 })
     .toBuffer();
+}
+
+/**
+ * Markers for an inspection's overview map: route inspections show numbered
+ * photos, findings and the GPS track; location inspections one pin on the site.
+ */
+export function overviewMapInput(ctx: InspectionContext, findingNr: (id: string, index: number) => number | null | undefined = (_id, i) => i + 1): Pick<StaticMapInput, "photos" | "findings" | "track" | "extraPoints" | "site"> {
+  if (!ctx.template.tracksRoute) {
+    return { photos: [], findings: [], track: null, site: inspectionSite(ctx.inspection, ctx.captures) };
+  }
+  const located = ctx.findings.filter((f) => f.lat !== null);
+  return {
+    photos: ctx.captures.filter((c) => c.lat !== null && ["photo", "video", "sketch"].includes(c.type) && !c.hiddenInReport).map((c) => ({ lat: c.lat!, lon: c.lon!, nr: c.seq })),
+    findings: located.map((f, i) => ({ lat: f.lat!, lon: f.lon!, priority: f.priority, nr: findingNr(f.id, i) })),
+    track: ctx.track?.lineGeojson ?? null,
+    extraPoints: ctx.inspection.lat !== null && ctx.inspection.lon !== null ? [{ lat: ctx.inspection.lat, lon: ctx.inspection.lon }] : [],
+  };
 }

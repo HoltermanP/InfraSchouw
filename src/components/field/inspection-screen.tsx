@@ -43,6 +43,7 @@ import { CaptureThumb, useCaptureUrl } from "./media";
 import { useHandsfree, speechRecognitionSupported } from "./use-handsfree";
 import { requestCompassPermission } from "./use-geo";
 import { useInspectionController } from "./use-inspection-controller";
+import { inspectionSite } from "@/lib/geo/site";
 
 type Overlay =
   | { kind: "camera"; mode: CameraMode }
@@ -88,6 +89,7 @@ function SketchBase({ captureId, captures, onSave, onCancel }: { captureId: stri
 export function InspectionScreen({ data, inspectionId, go, sync }: { data: Bootstrap; inspectionId: string; go: (r: FieldRoute) => void; sync: SyncState }) {
   const ctl = useInspectionController(data, inspectionId, isGlassesDevice() ? "glasses-browser" : "phone-camera");
   const { inspection, template, captures, photos, geo, activeShot } = ctl;
+  const site = inspection ? inspectionSite(inspection, captures) : null;
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [tab, setTab] = useState<Tab>("vastleggen");
   const cameraHandle = useRef<CameraHandle | null>(null);
@@ -337,8 +339,9 @@ export function InspectionScreen({ data, inspectionId, go, sync }: { data: Boots
             <LazyMap
               className="h-full"
               showUserLocation
-              captures={captures.filter((c) => c.lat !== null && c.lon !== null).map((c) => ({ id: c.id, type: c.type, lat: c.lat!, lon: c.lon!, seq: null, heading: c.heading }))}
-              findings={ctl.findings.filter((f) => f.lat !== null && f.lon !== null).map((f) => ({ id: f.id, lat: f.lat!, lon: f.lon!, priority: f.priority as "hoog", title: f.title }))}
+              captures={ctl.tracksRoute ? captures.filter((c) => c.lat !== null && c.lon !== null).map((c) => ({ id: c.id, type: c.type, lat: c.lat!, lon: c.lon!, seq: null, heading: c.heading })) : []}
+              findings={ctl.tracksRoute ? ctl.findings.filter((f) => f.lat !== null && f.lon !== null).map((f) => ({ id: f.id, lat: f.lat!, lon: f.lon!, priority: f.priority as "hoog", title: f.title })) : []}
+              points={!ctl.tracksRoute && site ? [{ id: "schouwlocatie", ...site, label: "Schouwlocatie", kind: "inspection" }] : []}
               onSelect={(sel) => sel?.kind === "capture" && setOverlay({ kind: "detail", captureId: sel.id })}
             />
           </div>

@@ -137,9 +137,13 @@ async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, te
       .sort((a, b) => a.s.at - b.s.at)
       .map(({ i }, n) => [i, n + 1]),
   );
+  // Location inspections (no route): every capture sits on the single inspection location.
+  const [insp] = template.tracksRoute ? [] : await db.select({ lat: inspections.lat, lon: inspections.lon }).from(inspections).where(eq(inspections.id, inspectionId));
+  const site: LatLon | null = insp?.lat != null && insp.lon != null ? [insp.lat, insp.lon] : null;
   for (const [i, s] of specs.entries()) {
     const type = s.type ?? "photo";
-    const { x, y } = wgs84ToRd(s.pos[0], s.pos[1]);
+    const pos = site ?? s.pos;
+    const { x, y } = wgs84ToRd(pos[0], pos[1]);
     const shot = s.shot ? template.shots.find((sh) => sh.title.startsWith(s.shot!)) : undefined;
     const [row] = await db
       .insert(captures)
@@ -152,13 +156,13 @@ async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, te
         mime: s.mime ?? (type === "photo" ? "image/jpeg" : null),
         size: null,
         durationMs: s.durationMs ?? null,
-        lat: s.pos[0],
-        lon: s.pos[1],
+        lat: pos[0],
+        lon: pos[1],
         rdX: x,
         rdY: y,
-        accuracy: 4.5,
+        accuracy: site ? null : 4.5,
         heading: s.heading ?? null,
-        locationSource: "gps",
+        locationSource: site ? "inspection" : "gps",
         capturedAt: new Date(start.getTime() + s.at * 60_000),
         source: "phone-camera",
         shotId: shot?.id ?? null,
@@ -487,7 +491,6 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
       })
       .returning();
     const pos = (i: number): LatLon => [st.lat! + Math.sin(i) * 0.00004, st.lon! + Math.cos(i) * 0.00006];
-    await insertTrack(schouwer, insp!.id, trackPoints([pos(0), pos(2), pos(4), pos(6)], start, 65, 11));
     const photo = (key: string, at: number, shot: string, cap: string, desc: string, extra: Partial<CaptureAnalysis> = {}, i = 0): CaptureSpec => ({ key, at, pos: pos(i), heading: (i * 47) % 360, shot, analysis: analysis(cap, desc, [], extra) });
     const caps = await insertCaptures(schouwer, insp!.id, start, t, [
       photo("st-01-overzicht", 2, "Overzicht vanaf straat", "Compact betonstation met omgeving vanaf de Frankhuizerallee.", "Nieuw compact station met betonbehuizing (wit/antraciet) op nog onafgewerkt maaiveld. Rode kabelbeschermbuizen liggen klaar voor de kabelinvoer.", { station_component: "buitenkant" }, 1),
@@ -650,7 +653,6 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
         createdBy: users.schouwer.id,
       })
       .returning();
-    await insertTrack(schouwer, insp!.id, trackPoints(seg, start, 38, 23));
     const at = (f: number) => interpolate(seg, f);
     const caps = await insertCaptures(schouwer, insp!.id, start, t, [
       { key: "nul-01-gevel", at: 3, pos: at(0.05), heading: 10, shot: "Gevels", analysis: analysis("Gevel nr. 112, vooropname.", "Metselwerkgevel zonder zichtbare scheuren of schade.", ["gevel"]) },
@@ -712,7 +714,6 @@ export async function seedDemoInspections(base: SeedBase, project: { id: string;
       })
       .returning();
     const around = (i: number): LatLon => [place[0] + Math.sin(i) * 0.00005, place[1] + Math.cos(i) * 0.00007];
-    await insertTrack(schouwer, insp!.id, trackPoints([around(0), around(1), around(2)], start, 32, 31));
     const caps = await insertCaptures(schouwer, insp!.id, start, t, [
       { key: "cal-01-overzicht", at: 2, pos: around(0.2), heading: 270, shot: "Overzicht situatie", analysis: analysis("Overzicht graafschade met graafmachine.", "Graafmachine van een derde partij naast een open ontgraving in het trottoir.", ["graafschade", "graafmachine"], { privacy_flags: { persons_recognizable: true, license_plates_visible: false, notes: "Machinist herkenbaar in cabine" } }) },
       { key: "cal-02-schade", at: 5, pos: around(0.4), heading: 180, shot: "Schade", analysis: analysis("Beschadigde LS-kabel in de ontgraving.", "Uit de grond getrokken LS-kabel; mantel over circa 1 m beschadigd, aders deels blootliggend.", ["kabel", "schade", "LS"], { possible_findings: [{ category: "veiligheid", description: "Blootliggende aders LS-kabel — direct afschermen", priority: "hoog", confidence: 0.9 }] }) },

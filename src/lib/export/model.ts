@@ -25,7 +25,7 @@ import type { InspectionContext } from "@/lib/report/context";
 import type { ReportMeta, TiptapDoc, TiptapNode } from "@/lib/report/types";
 import { FIELD_SOURCE_LABELS } from "@/lib/station/types";
 import { getPath } from "@/lib/station/merge";
-import { renderStaticMap } from "./static-map";
+import { overviewMapInput, renderStaticMap } from "./static-map";
 import { answerLabel } from "@/components/inspections/checklist-labels";
 
 export type Run = { text: string; bold?: boolean; italic?: boolean; underline?: boolean };
@@ -395,18 +395,17 @@ export async function buildReportModel(
     if (mapImage === undefined) {
       mapImage = opts.mapSnapshotUrl ? await loadImage(opts.mapSnapshotUrl, 2000, true) : null;
       if (!mapImage) {
-        const photos = ctx.captures.filter((c) => c.lat !== null && ["photo", "video", "sketch"].includes(c.type) && !c.hiddenInReport);
-        const png = await renderStaticMap({
-          photos: photos.map((c) => ({ lat: c.lat!, lon: c.lon!, nr: c.seq })),
-          findings: ctx.findings.filter((f) => f.lat !== null).map((f) => ({ lat: f.lat!, lon: f.lon!, priority: f.priority, nr: findingNr.get(f.id) })),
-          track: ctx.track?.lineGeojson ?? null,
-          area: null,
-          extraPoints: ctx.inspection.lat !== null ? [{ lat: ctx.inspection.lat, lon: ctx.inspection.lon! }] : [],
-        }).catch(() => null);
+        const png = await renderStaticMap({ ...overviewMapInput(ctx, (id) => findingNr.get(id)), area: null }).catch(() => null);
         mapImage = png ? { data: png, format: "png", width: 1600, height: 1000 } : null;
       }
     }
-    return { type: "map", image: mapImage, caption: "Overzichtskaart: genummerde fotolocaties (blauw), bevindingen (gekleurd naar prioriteit, nummer = B-nummer) en gelopen GPS-track (rood)." };
+    return {
+      type: "map",
+      image: mapImage,
+      caption: ctx.template.tracksRoute
+        ? "Overzichtskaart: genummerde fotolocaties (blauw), bevindingen (gekleurd naar prioriteit, nummer = B-nummer) en gelopen GPS-track (rood)."
+        : "Overzichtskaart: locatie van de schouw.",
+    };
   };
 
   const convert = async (nodes: TiptapNode[]): Promise<Block[]> => {

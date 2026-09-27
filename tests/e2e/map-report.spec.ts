@@ -30,6 +30,21 @@ test("kaart toont alle foto's; klik opent info; van kaart naar verslag en terug"
   await expect(page.getByTestId("map-side-panel")).toBeVisible();
 });
 
+test("locatieschouw toont één marker op de schouwlocatie; klik opent de foto's", async ({ page }) => {
+  await loginAs(page, "projectleider", "/schouwen");
+  const href = (await page.getByRole("link", { name: "Stationsoplevering ZWL-STH-4012 Frankhuizerallee" }).getAttribute("href"))!;
+  await page.goto(href);
+  await expect(page.getByTestId("infra-map")).toBeVisible();
+  await expect(page.getByText(/Schouwlocatie · 25 opnames/)).toBeVisible();
+  await expect(page.locator(".maplibre-point")).toHaveCount(1);
+  await expect(page.locator(".maplibre-capture, .maplibre-cluster, .maplibre-finding")).toHaveCount(0);
+  await page.locator(".maplibre-point").click();
+  const panel = page.getByTestId("map-side-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("Schouwlocatie")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Locatie corrigeren" })).toHaveCount(0);
+});
+
 test("tijdlijn toont captures en transcriptie gekoppeld aan foto's", async ({ page }) => {
   await loginAs(page, "lezer");
   const href = await traceHref(page);

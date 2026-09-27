@@ -19,6 +19,8 @@ import { fmtDateTime, fmtDuration } from "@/lib/format";
 import type { CaptureDto } from "@/lib/report/dto";
 import { cn } from "@/lib/utils";
 
+const SITE_ID = "schouwlocatie";
+
 export type MapFindingDto = { id: string; title: string; description: string; priority: Priority; category: FindingCategory; lat: number | null; lon: number | null; captureIds: string[]; aiAccepted: boolean; recommendation: string | null };
 
 export function CaptureMedia({ c, large = false }: { c: CaptureDto; large?: boolean }) {
@@ -156,6 +158,8 @@ export function InspectionMapView({
   area,
   klic,
   canEdit,
+  tracksRoute,
+  site,
 }: {
   inspectionId: string;
   reportId: string | null;
@@ -165,6 +169,9 @@ export function InspectionMapView({
   area: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
   klic: GeoJSON.FeatureCollection | null;
   canEdit: boolean;
+  /** Route inspection: marker per capture/finding plus track. Otherwise one marker on the inspection location. */
+  tracksRoute: boolean;
+  site: { lat: number; lon: number } | null;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -202,11 +209,13 @@ export function InspectionMapView({
 
   async function snapshot() {
     if (!mapRef.current || !reportId) return;
-    const blob = await mapSnapshot(
-      mapRef.current,
-      located.filter((c) => c.seq).map((c) => ({ lat: c.lat!, lon: c.lon!, seq: c.seq })),
-      findings.filter((f) => f.lat !== null).map((f) => ({ lat: f.lat!, lon: f.lon!, priority: f.priority })),
-    );
+    const blob = tracksRoute
+      ? await mapSnapshot(
+          mapRef.current,
+          located.filter((c) => c.seq).map((c) => ({ lat: c.lat!, lon: c.lon!, seq: c.seq })),
+          findings.filter((f) => f.lat !== null).map((f) => ({ lat: f.lat!, lon: f.lon!, priority: f.priority })),
+        )
+      : await mapSnapshot(mapRef.current, site ? [{ ...site, seq: null }] : [], []);
     const fd = new FormData();
     fd.set("file", blob, "kaart.png");
     const res = await fetch(`/api/reports/${reportId}/snapshot`, { method: "POST", body: fd });
@@ -221,13 +230,20 @@ export function InspectionMapView({
       <div className="relative h-[60vh] min-h-96 flex-1 lg:h-[calc(100dvh_-_16rem)]">
         <LazyMap
           className="h-full"
-          captures={located.map((c) => ({ id: c.id, type: c.type, lat: c.lat!, lon: c.lon!, seq: c.seq, heading: c.heading, label: `${CAPTURE_TYPE_LABELS[c.type]} ${c.seq ?? ""}` }))}
-          findings={findings.filter((f) => f.lat !== null && f.lon !== null).map((f) => ({ id: f.id, lat: f.lat!, lon: f.lon!, priority: f.priority, title: f.title }))}
-          track={track}
+          captures={tracksRoute ? located.map((c) => ({ id: c.id, type: c.type, lat: c.lat!, lon: c.lon!, seq: c.seq, heading: c.heading, label: `${CAPTURE_TYPE_LABELS[c.type]} ${c.seq ?? ""}` })) : []}
+          findings={tracksRoute ? findings.filter((f) => f.lat !== null && f.lon !== null).map((f) => ({ id: f.id, lat: f.lat!, lon: f.lon!, priority: f.priority, title: f.title })) : []}
+          points={!tracksRoute && site ? [{ id: SITE_ID, ...site, label: "Schouwlocatie", kind: "inspection" }] : []}
+          track={tracksRoute ? track : null}
+          // Location inspection: open zoomed in on the site rather than fitting the project area.
+          {...(!tracksRoute && site ? { center: [site.lat, site.lon] as [number, number], zoom: 17, fitToData: false } : {})}
           area={area}
           klic={klic}
-          selected={selected}
-          onSelect={setSelected}
+          selected={tracksRoute ? selected : null}
+          onSelect={(sel) => {
+            // Location inspection: the site marker opens the first capture; browse on from there.
+            if (sel?.kind === "point") setSelected(navigable[0] ? { kind: "capture", id: navigable[0].id } : null);
+            else setSelected(sel);
+          }}
           draggableCaptureId={moving}
           onCaptureDragEnd={(id, lat, lon) => {
             void run(() => setCaptureLocation(id, lat, lon));
@@ -237,7 +253,7 @@ export function InspectionMapView({
         />
         <div className="absolute right-2 bottom-8 z-10 flex flex-col items-end gap-1 text-xs">
           <span className="rounded bg-white/90 px-2 py-1 shadow">
-            {located.length} op kaart · {captures.length - located.length} zonder locatie
+            {tracksRoute ? `${located.length} op kaart · ${captures.length - located.length} zonder locatie` : `Schouwlocatie · ${captures.length} opnames`}
           </span>
           {reportId && canEdit ? (
             <Button size="sm" variant="secondary" onClick={snapshot} className="shadow">
@@ -276,7 +292,7 @@ export function InspectionMapView({
               </div>
             </div>
             <CaptureMedia c={selCapture} large />
-            <CaptureInfo c={selCapture} inspectionId={inspectionId} canEdit={canEdit} onMove={() => setMoving(selCapture.id)} />
+            <CaptureInfo c={selCapture} inspectionId={inspectionId} canEdit={canEdit} onMove={tracksRoute ? () => setMoving(selCapture.id) : undefined} />
             {moving === selCapture.id ? <p className="rounded bg-amber-100 p-2 text-xs text-amber-900">Sleep de marker op de kaart naar de juiste plek.</p> : null}
           </div>
         ) : selFinding ? (
@@ -314,7 +330,8 @@ export function InspectionMapView({
               <MapPin className="size-4" /> Klik op een marker voor details. Pijltjestoetsen of vegen bladert door de foto&apos;s.
             </p>
             <p className="flex items-center gap-2">
-              <CameraIcon className="size-4" /> Rode lijn = gelopen GPS-track; gekleurde spelden = bevindingen per prioriteit.
+              <CameraIcon className="size-4" />
+              {tracksRoute ? "Rode lijn = gelopen GPS-track; gekleurde spelden = bevindingen per prioriteit." : "Alle opnames horen bij de schouwlocatie (blauwe stip)."}
             </p>
             <ul className={cn("mt-2 grid grid-cols-4 gap-2")}>
               {navigable.filter((c) => c.type === "photo" || c.type === "video" || c.type === "sketch").slice(0, 16).map((c) => (
