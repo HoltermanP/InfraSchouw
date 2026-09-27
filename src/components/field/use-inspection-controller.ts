@@ -209,7 +209,7 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
     async (mode: "continuous" | "ptt" | "voice-note", parentId: string | null = null) => {
       if (recorder.current?.recording) return;
       voiceParent.current = parentId;
-      recorder.current = new AudioRecorderSession((clip) => void addAudio(clip, voiceParent.current), 600);
+      recorder.current = new AudioRecorderSession((clip) => void addAudio(clip, voiceParent.current), 60);
       await recorder.current.start();
       setAudioMode(mode);
     });
@@ -218,6 +218,21 @@ export function useInspectionController(data: Bootstrap, inspectionId: string, s
     recorder.current = null;
     setAudioMode(null);
   };
+  // Store speech as soon as the app goes to the background, and when leaving the screen.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") recorder.current?.flush();
+    };
+    const onPageHide = () => recorder.current?.flush();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+      recorder.current?.stop();
+      recorder.current = null;
+    };
+  }, []);
 
   return {
     identity,

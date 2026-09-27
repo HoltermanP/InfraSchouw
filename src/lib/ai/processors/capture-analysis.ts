@@ -1,8 +1,8 @@
 import "server-only";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 import type { ResponseInputContent } from "openai/resources/responses/responses";
 import { db } from "@/db/client";
-import { captureAnalyses, captures, inspections, inspectionTemplates, templateShots } from "@/db/schema";
+import { captureAnalyses, captures, inspections, inspectionTemplates, templateShots, transcriptSegments } from "@/db/schema";
 import { captureAnalysisSchema } from "@/lib/ai/schemas";
 import { VISION_SYSTEM } from "@/lib/ai/prompts";
 import { structuredCall } from "@/lib/ai/structured";
@@ -85,11 +85,18 @@ export async function processCaptureAnalysis(ctx: JobContext): Promise<JobOutcom
         .limit(1)
     : [];
   const [shot] = capture.shotId ? await db.select().from(templateShots).where(eq(templateShots.id, capture.shotId)).limit(1) : [];
+  // Speech linked to this capture (voice note or spoken during the shot), when already transcribed.
+  const spoken = await db
+    .select({ text: transcriptSegments.text })
+    .from(transcriptSegments)
+    .where(and(eq(transcriptSegments.orgId, ctx.org.id), sql`${capture.id}::uuid = any(${transcriptSegments.captureIds})`))
+    .orderBy(transcriptSegments.startAt);
   const contextLines = [
     insp ? `Schouwtype: ${insp.template}${insp.isStation ? " (MS-station)" : ""}. Schouw: ${insp.title}.` : "Losse capture (nog niet aan een schouw gekoppeld).",
     shot ? `Shotlist-item: ${shot.groupName} – ${shot.title}.` : null,
     capture.note ? `Notitie van de schouwer: ${capture.note}` : null,
     capture.tags.length ? `Tags van de schouwer: ${capture.tags.join(", ")}` : null,
+    spoken.length ? `Gesproken toelichting van de schouwer rond deze foto: ${spoken.map((s) => s.text).join(" ")}` : null,
     capture.type === "video" ? `Dit zijn ${images.length} keyframes uit één video; analyseer de video als geheel.` : null,
     capture.type === "sketch" ? "Dit is een schets/annotatie van de schouwer." : null,
   ].filter(Boolean);

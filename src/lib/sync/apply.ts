@@ -24,6 +24,7 @@ import { trackToLineString } from "@/lib/geo/track-matching";
 import { relocateFromTrack, rdFor, tracksRoute, upsertCapture } from "@/lib/capture-sources/persist";
 import { deleteObject, belongsToOrg } from "@/lib/storage";
 import { enqueueCaptureProcessing, enqueueInspectionProcessing } from "@/lib/ai/enqueue";
+import { linkSegmentsToCaptures } from "@/lib/ai/link-segments";
 import type { SyncOp, SyncOpResult } from "./ops";
 
 type SideEffect = () => Promise<unknown>;
@@ -142,6 +143,8 @@ async function applyOne(ctx: OrgCtx, op: SyncOp, tx: Tx, effects: SideEffect[]) 
       for (const kf of p.meta.keyframes ?? []) assertStoredUrl(ctx, kf.url);
       const { capture, created } = await upsertCapture(ctx, p, tx);
       if (created) effects.push(() => enqueueCaptureProcessing(ctx, capture));
+      // Photos often arrive after the speech was transcribed: link them to the spoken text now.
+      if (created && capture.inspectionId && capture.type !== "audio") effects.push(() => linkSegmentsToCaptures(ctx.orgId, capture.inspectionId!));
       return;
     }
     case "capture.update": {

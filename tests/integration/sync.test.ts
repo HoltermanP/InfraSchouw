@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { closeDb, db } from "@/db/client";
-import { captures, findingCaptures, gpsTracks, inspections } from "@/db/schema";
+import { captures, findingCaptures, gpsTracks, inspections, transcriptSegments, transcripts } from "@/db/schema";
 import { ensureStandardTemplates, getTemplatesFull } from "@/db/queries/templates";
 import { applySyncOps } from "@/lib/sync/apply";
 import type { SyncOp } from "@/lib/sync/ops";
@@ -19,6 +19,39 @@ describe.skipIf(!hasDb)("offline sync (server)", () => {
   afterAll(async () => {
     await dropTestOrgs([a?.org.id, b?.org.id].filter(Boolean) as string[]);
     await closeDb();
+  });
+
+  it("koppelt een foto die na de transcriptie binnenkomt alsnog aan de gesproken tekst", async () => {
+    const tpl = (await getTemplatesFull(a.ctx.schouwer)).find((t) => t.key === "trace")!;
+    const inspectionId = crypto.randomUUID();
+    const audioId = crypto.randomUUID();
+    const photoId = crypto.randomUUID();
+    const t0 = Date.parse("2026-09-02T10:00:00Z");
+    const capture = (id: string, type: "audio" | "photo", at: number) => ({
+      id: crypto.randomUUID(),
+      kind: "capture.upsert" as const,
+      payload: {
+        id, inspectionId, type, blobUrl: `local:orgs/${a.org.id}/inspections/${inspectionId}/${id}`, thumbUrl: null, mime: type === "audio" ? "audio/webm" : "image/jpeg", size: 10, durationMs: null,
+        lat: null, lon: null, accuracy: null, heading: null, locationSource: "none" as const, capturedAt: new Date(at).toISOString(), source: "phone-camera" as const, shotId: null, tags: [], note: null, textContent: null, parentCaptureId: null, meta: {},
+      },
+    });
+    const first = await applySyncOps(a.ctx.schouwer, [
+      { id: crypto.randomUUID(), kind: "inspection.upsert", payload: { id: inspectionId, templateId: tpl.id, projectId: null, stationId: null, title: "Late foto", startedAt: new Date(t0).toISOString(), lat: 52.5, lon: 6.1 } },
+      capture(audioId, "audio", t0),
+    ]);
+    expect(first.every((r) => r.ok)).toBe(true);
+    // Transcription finished before the photo arrived.
+    const [tr] = await db.insert(transcripts).values({ orgId: a.org.id, inspectionId, captureId: audioId, text: "Hier ligt de kabel te ondiep.", model: "test" }).returning();
+    const [seg] = await db
+      .insert(transcriptSegments)
+      .values({ orgId: a.org.id, transcriptId: tr!.id, inspectionId, startMs: 0, endMs: 5000, startAt: new Date(t0), endAt: new Date(t0 + 5000), text: "Hier ligt de kabel te ondiep." })
+      .returning();
+    expect(seg!.captureIds).toEqual([]);
+
+    const late = await applySyncOps(a.ctx.schouwer, [capture(photoId, "photo", t0 + 8000)]);
+    expect(late.every((r) => r.ok)).toBe(true);
+    const [after] = await db.select().from(transcriptSegments).where(eq(transcriptSegments.id, seg!.id));
+    expect(after!.captureIds).toEqual([photoId]);
   });
 
   it("past een volledige offline schouw idempotent toe (replay geeft geen duplicaten)", async () => {

@@ -15,6 +15,7 @@ import { mergeAiDescription, pruneCaptureIds } from "@/lib/station/merge";
 import { getStationDescription, runAsbuiltCheck, saveStationDescription } from "@/lib/station/service";
 import { audit } from "@/db/queries/audit";
 import { enqueueJob } from "@/lib/ai/enqueue";
+import { linkSegmentsToCaptures } from "@/lib/ai/link-segments";
 import type { OrgCtx } from "@/db/scope";
 import type { JobContext, JobOutcome } from "./types";
 
@@ -165,6 +166,8 @@ export async function processReportSynthesis(ctx: JobContext): Promise<JobOutcom
     throw new SkipJob(ctx.openai ? "Verslag-synthese staat uit — basisverslag gemaakt uit de vastgelegde gegevens." : "AI overgeslagen (geen OpenAI-sleutel) — basisverslag gemaakt uit de vastgelegde gegevens.");
   }
 
+  // Link spoken text to all captures that have arrived by now (also late uploads).
+  await linkSegmentsToCaptures(ctx.org.id, inspectionId);
   let ictx = await loadInspectionContext(ctx.org.id, inspectionId);
   if (!ictx) throw new SkipJob("Schouw bestaat niet meer.");
 

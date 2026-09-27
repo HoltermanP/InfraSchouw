@@ -7,6 +7,29 @@ export function canvasToBlob(canvas: HTMLCanvasElement | OffscreenCanvas, type =
   );
 }
 
+/**
+ * Downscale a camera photo for storage and upload (full sensor photos are
+ * often 10+ MB, which makes uploads over mobile data slow and fragile).
+ * Keeps the original when it is already small or cannot be decoded.
+ */
+export async function optimizePhoto(blob: Blob, maxDim = 3200, quality = 0.85): Promise<{ blob: Blob; mime: string }> {
+  const keep = { blob, mime: blob.type || "image/jpeg" };
+  if (blob.size < 2.5 * 1024 * 1024) return keep;
+  try {
+    const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" } as ImageBitmapOptions);
+    const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bmp.width * scale));
+    canvas.height = Math.max(1, Math.round(bmp.height * scale));
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close();
+    const out = await canvasToBlob(canvas, "image/jpeg", quality);
+    return out.size < blob.size ? { blob: out, mime: "image/jpeg" } : keep;
+  } catch {
+    return keep;
+  }
+}
+
 /** Scaled JPEG thumbnail (max side `max` px), respecting EXIF orientation. */
 export async function makeThumbnail(blob: Blob, max = 480, quality = 0.78): Promise<{ blob: Blob; width: number; height: number }> {
   const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" } as ImageBitmapOptions);

@@ -4,8 +4,9 @@ export type AudioClip = { blob: Blob; mime: string; startedAt: Date; durationMs:
 
 /**
  * Microphone recorder. Continuous recordings are rotated every
- * `rotateSeconds` into separate, independently decodable files (each stays
- * well below the 25 MB transcription limit).
+ * `rotateSeconds` into separate, independently decodable files, so speech is
+ * stored regularly instead of only when the recording is stopped (a phone
+ * that suspends or closes the app would otherwise lose the whole recording).
  */
 export class AudioRecorderSession {
   private stream: MediaStream | null = null;
@@ -44,11 +45,30 @@ export class AudioRecorderSession {
       if (this.chunks.length) {
         this.onClip({ blob: new Blob(this.chunks, { type }), mime: type, startedAt: this.startedAt, durationMs: Date.now() - this.startedAt.getTime(), seriesId: this.seriesId });
       }
-      if (!this.stopping) this.begin();
+      if (this.stopping) return;
+      if (this.stream?.active) this.begin();
+      else {
+        // The OS ended the microphone (app in background): pick it up again.
+        void navigator.mediaDevices
+          .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+          .then((s) => {
+            if (this.stopping) return s.getTracks().forEach((t) => t.stop());
+            this.stream = s;
+            this.begin();
+          })
+          .catch(() => undefined);
+      }
     };
     rec.start(1000);
     this.recorder = rec;
     this.rotateTimer = setTimeout(() => this.recorder?.stop(), this.rotateSeconds * 1000);
+  }
+
+  /** Store what has been recorded so far as a clip and continue recording. */
+  flush() {
+    if (this.stopping || this.recorder?.state !== "recording") return;
+    if (this.rotateTimer) clearTimeout(this.rotateTimer);
+    this.recorder.stop();
   }
 
   stop() {

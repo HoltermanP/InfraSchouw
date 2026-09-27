@@ -1,4 +1,4 @@
-import { canvasToBlob, extractVideoKeyframes, makeThumbnail, pickRecorderMime } from "../media/client";
+import { canvasToBlob, extractVideoKeyframes, makeThumbnail, optimizePhoto, pickRecorderMime } from "../media/client";
 import type { CaptureSourceKind } from "../domain";
 import type { CaptureSource } from "./types";
 
@@ -78,7 +78,8 @@ export class PhoneCameraSource implements CaptureSource {
       blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
     }
     const thumb = await makeThumbnail(blob);
-    return { blob, thumb: thumb.blob, width: thumb.width, height: thumb.height, mime: blob.type || "image/jpeg" };
+    const photo = await optimizePhoto(blob);
+    return { blob: photo.blob, thumb: thumb.blob, width: thumb.width, height: thumb.height, mime: photo.mime };
   }
 
   async startVideo(): Promise<void> {
@@ -139,5 +140,6 @@ export class PhoneCameraSource implements CaptureSource {
 /** Fallback when getUserMedia is not available: the native camera app via <input capture>. */
 export async function photoFromFile(file: File): Promise<PhotoResult> {
   const thumb = await makeThumbnail(file);
-  return { blob: file, thumb: thumb.blob, width: thumb.width, height: thumb.height, mime: file.type || "image/jpeg" };
+  const photo = await optimizePhoto(file);
+  return { blob: photo.blob, thumb: thumb.blob, width: thumb.width, height: thumb.height, mime: photo.mime };
 }

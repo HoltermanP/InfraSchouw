@@ -44,7 +44,8 @@ export const REPORT_RULES = `Regels (strikt):
 - Gebruik de foto-analyses (analyse.beschrijving, mogelijke_bevindingen, typeplaat, ocr) als bron voor de tekst en neem bevindingen uit foto's over.
 - Elke niet-verborgen foto komt precies één keer in het verslag. Gebruik per foto een photo-blok met een kort bijschrift (caption) en een toelichting (explanation): 2-4 zinnen over wat zichtbaar is en wat dat betekent voor de bevinding of de tekst ervoor. Gebruik photo_grid alleen voor een reeks vergelijkbare overzichtsfoto's zonder eigen boodschap.
 - Schrijf zakelijk, kort en in het Nederlands. Geen marketingtaal, geen superlatieven.
-- Tekstnotities en checklistantwoorden van de schouwer zijn leidend boven eigen interpretatie van foto's.
+- Tekstnotities, gesproken tekst en checklistantwoorden van de schouwer zijn leidend boven eigen interpretatie van foto's.
+- Verwerk gesproken tekst (transcriptie) inhoudelijk in het verslag. Gesproken tekst die aan een foto is gekoppeld (transcriptie.capture_ids) hoort in de toelichting van die foto.
 - Prioriteit hoog alleen bij veiligheidsrisico's, directe schade of contractuele non-conformiteit.`;
 
 export const VISION_SYSTEM = `Je bent een ervaren toezichthouder ondergrondse infrastructuur (kabels & leidingen, MS-netten, MS-stations) in Nederland.
