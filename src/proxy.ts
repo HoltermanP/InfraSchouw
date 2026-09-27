@@ -42,8 +42,9 @@ export default clerkEnabled ? clerkProxy : demoProxy;
 
 export const config = {
   matcher: [
-    // Skip Next.js internals, the service worker and all static files.
-    "/((?!_next|sw\\.js|swe-worker|manifest\\.webmanifest|[^?]*\\.(?:html?|css|m?js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Skip Next.js internals, the service worker and all static files (incl. demo audio/video,
+    // which the service worker precaches: a 404 there aborts its installation).
+    "/((?!_next|sw\\.js|swe-worker|manifest\\.webmanifest|[^?]*\\.(?:html?|css|m?js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm|mov|wav|mp3|m4a|ogg|md|txt)).*)",
     "/(api|trpc)(.*)",
   ],
 };
