@@ -1,6 +1,7 @@
 /**
  * Generates the demo media in public/demo (run once; output is committed):
- *   pnpm demo:assets
+ *   pnpm demo:assets            (all images)
+ *   pnpm demo:assets --missing  (only images that do not exist yet)
  * Photos are real, freely licensed images from Wikimedia Commons (downloaded once
  * into node_modules/.cache/demo-photos), cropped to 4:3 and marked "Demo" with their
  * attribution. Nameplates and the station sign are rendered on top of a real photo.
@@ -150,8 +151,12 @@ function captionSvg(a: DemoAsset, info: PhotoInfo): string {
 </svg>`;
 }
 
+/** `--missing`: only render images that do not exist yet (existing files stay byte-identical). */
+const ONLY_MISSING = process.argv.includes("--missing");
+
 async function renderAsset(a: DemoAsset): Promise<PhotoInfo> {
   const { buf, info } = await commonsPhoto(a.photo.file);
+  if (ONLY_MISSING && existsSync(path.join(OUT, `${a.key}.jpg`))) return info;
   let base = await frame(buf, a);
   if (a.plate || a.sign) {
     // Close-up: blur and darken the real background so the rendered plate reads as the subject.
@@ -191,6 +196,10 @@ async function main() {
   const credits: { a: DemoAsset; info: PhotoInfo }[] = [];
   for (const a of DEMO_ASSETS) credits.push({ a, info: await renderAsset(a) });
   writeFileSync(path.join(OUT, "CREDITS.md"), creditsMarkdown(credits));
+  if (ONLY_MISSING) {
+    console.log(`Ontbrekende demofoto's gegenereerd in public/demo (CREDITS.md bijgewerkt)`);
+    return;
+  }
   // Signatures
   const sigs = [
     "M20 80 C60 10 90 140 130 60 S200 20 230 90 S300 40 330 70",

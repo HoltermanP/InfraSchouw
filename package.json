@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate && tsx scripts/fix-migrations.ts",
     "db:migrate": "tsx --require ./scripts/preload.cjs scripts/migrate.ts",
     "db:seed": "tsx --require ./scripts/preload.cjs scripts/seed.ts",
+    "seed:showcase": "tsx --require ./scripts/preload.cjs scripts/seed-showcase.ts",
     "demo:assets": "tsx --require ./scripts/preload.cjs scripts/generate-demo-assets.ts",
     "postinstall": "node scripts/copy-maplibre-worker.mjs",
     "predev": "node scripts/copy-maplibre-worker.mjs",

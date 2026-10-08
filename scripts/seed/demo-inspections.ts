@@ -40,7 +40,7 @@ import { generateToken, hashToken } from "../../src/lib/share";
 import { newDeviceToken } from "../../src/lib/devices";
 import type { SeedBase } from "./demo";
 
-type LatLon = [number, number];
+export type LatLon = [number, number];
 
 /**
  * MS-route from station ZWL-STH-4012 to ZWL-STH-4013 (Zwolle-Stadshagen), following the public
@@ -62,7 +62,7 @@ export const ROUTE: LatLon[] = [
   [52.534449, 6.058166],
 ];
 
-function interpolate(route: LatLon[], f: number): LatLon {
+export function interpolate(route: LatLon[], f: number): LatLon {
   const segs = route.slice(1).map((p, i) => ({ a: route[i]!, b: p, len: lineLengthMeters([{ lat: route[i]![0], lon: route[i]![1] }, { lat: p[0], lon: p[1] }]) }));
   const total = segs.reduce((n, s) => n + s.len, 0);
   let d = Math.max(0, Math.min(1, f)) * total;
@@ -85,7 +85,7 @@ function rng(seed: number) {
   };
 }
 
-function trackPoints(route: LatLon[], start: Date, minutes: number, seed: number) {
+export function trackPoints(route: LatLon[], start: Date, minutes: number, seed: number) {
   const r = rng(seed);
   const n = Math.round((minutes * 60) / 5);
   return Array.from({ length: n }, (_, i) => {
@@ -94,7 +94,7 @@ function trackPoints(route: LatLon[], start: Date, minutes: number, seed: number
   });
 }
 
-const analysis = (caption: string, description: string, tags: string[], extra: Partial<CaptureAnalysis> = {}): CaptureAnalysis => ({
+export const analysis = (caption: string, description: string, tags: string[], extra: Partial<CaptureAnalysis> = {}): CaptureAnalysis => ({
   caption,
   description,
   tags,
@@ -107,7 +107,7 @@ const analysis = (caption: string, description: string, tags: string[], extra: P
   ...extra,
 });
 
-type CaptureSpec = {
+export type CaptureSpec = {
   key?: string;
   type?: "photo" | "video" | "audio" | "note" | "measurement" | "scan";
   at: number; // minutes after start
@@ -126,7 +126,7 @@ type CaptureSpec = {
   meta?: Record<string, unknown>;
 };
 
-async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, template: TemplateFull, specs: CaptureSpec[]) {
+export async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, template: TemplateFull, specs: CaptureSpec[]) {
   const ids: string[] = [];
   const isNumbered = (s: CaptureSpec) => (s.type ?? "photo") === "photo" || s.type === "video";
   // Photo/video numbers follow capture time, not the order of the specs.
@@ -183,7 +183,7 @@ async function insertCaptures(ctx: OrgCtx, inspectionId: string, start: Date, te
   return ids;
 }
 
-async function insertTrack(ctx: OrgCtx, inspectionId: string, pts: ReturnType<typeof trackPoints>) {
+export async function insertTrack(ctx: OrgCtx, inspectionId: string, pts: ReturnType<typeof trackPoints>) {
   for (let i = 0; i < pts.length; i += 400) {
     await db.insert(gpsPoints).values(pts.slice(i, i + 400).map((p) => ({ orgId: ctx.orgId, inspectionId, lat: p.lat, lon: p.lon, accuracy: p.accuracy, recordedAt: p.t })));
   }
@@ -191,7 +191,7 @@ async function insertTrack(ctx: OrgCtx, inspectionId: string, pts: ReturnType<ty
   await db.insert(gpsTracks).values({ orgId: ctx.orgId, inspectionId, lineGeojson: line, pointCount: pts.length, lengthM: lineLengthMeters(pts) });
 }
 
-async function insertTranscript(ctx: OrgCtx, inspectionId: string, audioId: string, audioStart: Date, segments: { from: number; to: number; text: string }[]) {
+export async function insertTranscript(ctx: OrgCtx, inspectionId: string, audioId: string, audioStart: Date, segments: { from: number; to: number; text: string }[]) {
   const [t] = await db
     .insert(transcripts)
     .values({ orgId: ctx.orgId, inspectionId, captureId: audioId, text: segments.map((s) => s.text).join(" "), model: "demo-seed", createdBy: ctx.userId })
@@ -216,9 +216,9 @@ async function insertTranscript(ctx: OrgCtx, inspectionId: string, audioId: stri
   );
 }
 
-type FindingSpec = { title: string; description: string; category: FindingCategory; priority: Priority; captureIdx: number[]; recommendation: string; status?: "open" | "in_behandeling" | "opgelost"; source?: "handmatig" | "ai" | "transcript"; accepted?: boolean };
+export type FindingSpec = { title: string; description: string; category: FindingCategory; priority: Priority; captureIdx: number[]; recommendation: string; status?: "open" | "in_behandeling" | "opgelost"; source?: "handmatig" | "ai" | "transcript"; accepted?: boolean };
 
-async function insertFindings(ctx: OrgCtx, inspectionId: string, projectId: string | null, capIds: string[], specs: FindingSpec[]) {
+export async function insertFindings(ctx: OrgCtx, inspectionId: string, projectId: string | null, capIds: string[], specs: FindingSpec[]) {
   const ids: string[] = [];
   for (const [i, f] of specs.entries()) {
     const firstCap = capIds[f.captureIdx[0] ?? -1];
@@ -250,7 +250,7 @@ async function insertFindings(ctx: OrgCtx, inspectionId: string, projectId: stri
   return ids;
 }
 
-async function answerAll(ctx: OrgCtx, inspectionId: string, template: TemplateFull, answers: Record<number, { value: string | number | null; note?: string; caps?: string[] }>, at: Date) {
+export async function answerAll(ctx: OrgCtx, inspectionId: string, template: TemplateFull, answers: Record<number, { value: string | number | null; note?: string; caps?: string[] }>, at: Date) {
   const rows = template.checklist.map((item, i) => {
     const a = answers[i] ?? { value: item.answerType === "yes_no_na" ? "ja" : item.answerType === "choice" ? (item.options[0] ?? null) : item.answerType === "number" ? 0 : "" };
     return { orgId: ctx.orgId, inspectionId, itemId: item.id, value: a.value, note: a.note ?? null, captureIds: a.caps ?? [], answeredAt: at, createdBy: ctx.userId };
@@ -258,7 +258,7 @@ async function answerAll(ctx: OrgCtx, inspectionId: string, template: TemplateFu
   if (rows.length) await db.insert(checklistAnswers).values(rows);
 }
 
-async function makeReport(
+export async function makeReport(
   ctx: OrgCtx,
   inspectionId: string,
   draftFn: (capIds: string[], findingIds: string[]) => ReportDraft,
